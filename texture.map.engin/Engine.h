@@ -12,7 +12,7 @@
 #include "Mesh.h"
 #include "Block.h"
 #include "Board.h"
-
+#include "Player.h"
 
 
 
@@ -55,15 +55,18 @@ private:
     void Draw();      // 描画
 
     // ブロックをランダムに生成する関数
-    void SpawnRandomBlock();
+    //void SpawnRandomBlock();
 
     // ウィンドウ関連
     HWND m_hwnd;
     int m_width;
     int m_height;
 
-    Block m_fallingBlock; // 現在落下中のブロック
-    Board m_board;
+    Player m_player1;
+    Player m_player2;
+
+    //Block m_fallingBlock; // 現在落下中のブロック
+    //Board m_board;
 
     //自分で頂点バッファを持たず、Meshクラスに任せる
     Mesh m_frame;       // 枠用のモデル
@@ -97,7 +100,7 @@ private:
     //深度バッファ（奥のものを隠すためのデータ）
     Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_depthStencilView;
 
-    int m_waitTimer; // アニメーション待機用タイマー
+   // int m_waitTimer; // アニメーション待機用タイマー
 
     float m_angle; // 回転角度
 };

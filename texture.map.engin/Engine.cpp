@@ -23,7 +23,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
 // コンストラクタでモデルの初期位置（原点）を設定
 Engine::Engine() : m_hwnd(nullptr), m_width(800), m_height(600), m_angle(0.0f),
-m_posX(0.0f), m_posY(0.0f), m_posZ(0.0f), m_scale(0.3f), m_waitTimer(0)
+m_posX(0.0f), m_posY(0.0f), m_posZ(0.0f), m_scale(0.3f)
 { 
 
 }
@@ -174,8 +174,10 @@ bool Engine::InitScene() {
     sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
     m_device->CreateSamplerState(&sampDesc, &m_samplerState);
 
-    // ゲーム開始時に最初のブロックを出現させる
-    SpawnRandomBlock();
+   
+
+    m_player1.Init(-5.4f, 0.0f); // 変更：-4.0f から -5.4f へ
+    m_player2.Init(0.6f, 0.0f); // 変更： 2.0f から  0.6f へ
 
     return true;
 }
@@ -240,6 +242,7 @@ bool Engine::InitScene() {
 //    }
 //}
 
+/*
 void Engine::Update() {
     // 1. もし待機中なら、カウントを減らして今回は何もしない（アニメーション効果）
     if (m_waitTimer > 0) {
@@ -302,6 +305,20 @@ void Engine::Update() {
     }
 }
 
+*/
+
+void Engine::Update() 
+{
+    // プレイヤー1の更新 (A, D, Sキーで操作、CPUではない=false)
+    m_player1.Update('A', 'D', 'S', false);
+
+    // プレイヤー2の更新 (矢印キーで操作、CPUモード=true)
+    // ★ ここを false にすれば「友達と2人プレイ」、true にすれば「CPU対戦」になります！
+    m_player2.Update(VK_LEFT, VK_RIGHT, VK_DOWN, true);
+}
+
+
+/*
 void Engine::SpawnRandomBlock() {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -317,8 +334,9 @@ void Engine::SpawnRandomBlock() {
 
     m_fallingBlock.Spawn(randomType, startX, startY);
 }
+*/
 
-
+/*
 void Engine::Draw() {
     float clearColor[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
     m_context->ClearRenderTargetView(m_renderTargetView.Get(), clearColor);
@@ -337,7 +355,7 @@ void Engine::Draw() {
 
     XMMATRIX mWorld = mScale * mRot * mTrans;
     // カメラ位置
-    XMMATRIX mView = XMMatrixLookAtLH(XMVectorSet(0.0f, 3.0f, -10.0f, 0.0f), XMVectorSet(0.0f, 3.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+    XMMATRIX mView = XMMatrixLookAtLH(XMVectorSet(0.0f, 3.0f, -15.0f, 0.0f), XMVectorSet(0.0f, 3.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
     XMMATRIX mProjection = XMMatrixPerspectiveFovLH(XM_PIDIV4, (float)m_width / (float)m_height, 0.01f, 100.0f);
 
     // Enginepp.cpp の Draw() 内の ConstantBuffer 更新部分を修正
@@ -386,6 +404,7 @@ void Engine::Draw() {
 
 
 // --- ② 落下中ブロックの描画 ---
+
     if (m_fallingBlock.IsActive()) {
         int type = m_fallingBlock.GetType();
 
@@ -432,7 +451,103 @@ void Engine::Draw() {
 
     m_swapChain->Present(1, 0);
 }
+*/
 
+void Engine::Draw() {
+    float clearColor[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
+    m_context->ClearRenderTargetView(m_renderTargetView.Get(), clearColor);
+    m_context->ClearDepthStencilView(m_depthStencilView.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+    m_context->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), m_depthStencilView.Get());
+
+    // ★変更: カメラのZ座標を -10.0f から -18.0f に下げて、2つの盤面が画面に収まるように引きます
+    XMMATRIX mView = XMMatrixLookAtLH(XMVectorSet(0.0f, 3.0f, -18.0f, 0.0f), XMVectorSet(0.0f, 3.0f, 0.0f, 0.0f), XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+    XMMATRIX mProjection = XMMatrixPerspectiveFovLH(XM_PIDIV4, (float)m_width / (float)m_height, 0.01f, 100.0f);
+
+    ConstantBuffer cb = {};
+    cb.vLightDir = XMFLOAT4(1.0f, -1.0f, 1.0f, 0.0f);
+    cb.vLightColor = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+
+    XMFLOAT4 blockColors[4] = {
+        XMFLOAT4(1.0f, 0.2f, 0.2f, 1.0f), // 赤
+        XMFLOAT4(0.2f, 1.0f, 0.2f, 1.0f), // 緑
+        XMFLOAT4(0.2f, 0.4f, 1.0f, 1.0f), // 青
+        XMFLOAT4(1.0f, 1.0f, 0.2f, 1.0f)  // 黄
+    };
+
+    // シェーダーのセット
+    m_context->IASetInputLayout(m_inputLayout.Get());
+    m_context->VSSetShader(m_vertexShader.Get(), NULL, 0);
+    m_context->VSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
+    m_context->PSSetConstantBuffers(0, 1, m_constantBuffer.GetAddressOf());
+    m_context->PSSetShaderResources(0, 1, m_texture.GetAddressOf());
+    m_context->PSSetSamplers(0, 1, m_samplerState.GetAddressOf());
+    m_context->PSSetShader(m_pixelShader.Get(), NULL, 0);
+
+    // ★追加: 2人のプレイヤーを順番に処理するための配列
+    Player* players[2] = { &m_player1, &m_player2 };
+
+    for (int p = 0; p < 2; ++p) {
+        Player* current_player = players[p];
+
+        // --- ① 枠の描画 ---
+        // プレイヤーの基準座標(m_baseX)に合わせて枠も移動させます。
+        // （元のプログラムでボールの左端が-2.4fの時、枠が0.0fにあったため、+2.4fずらして中央を合わせます）
+        float framePosX = current_player->m_baseX + 2.4f;
+
+        XMMATRIX mScaleFrame = XMMatrixScaling(m_scale, m_scale, m_scale);
+        XMMATRIX mRotFrame = XMMatrixRotationY(m_angle);
+        XMMATRIX mTransFrame = XMMatrixTranslation(framePosX, m_posY, m_posZ);
+        XMMATRIX mWorldFrame = mScaleFrame * mRotFrame * mTransFrame;
+
+        cb.vColor = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f); // 枠は元の色(白)
+        cb.mWorldViewProj = XMMatrixTranspose(mWorldFrame * mView * mProjection);
+        cb.mWorld = XMMatrixTranspose(mWorldFrame);
+        m_context->UpdateSubresource(m_constantBuffer.Get(), 0, NULL, &cb, 0, 0);
+        m_frame.Draw(m_context.Get());
+
+        // --- ② 落下中ブロックの描画 ---
+        if (current_player->m_fallingBlock.IsActive()) {
+            int type = current_player->m_fallingBlock.GetType();
+
+            XMMATRIX mScaleBlock = XMMatrixScaling(m_scale, m_scale, m_scale);
+            XMMATRIX mRotBlock = XMMatrixRotationY(m_angle);
+            XMMATRIX mTransBlock = XMMatrixTranslation(current_player->m_fallingBlock.GetX(), current_player->m_fallingBlock.GetY(), 0.0f);
+            XMMATRIX mWorldBlock = mScaleBlock * mRotBlock * mTransBlock;
+
+            cb.vColor = blockColors[type];
+            cb.mWorldViewProj = XMMatrixTranspose(mWorldBlock * mView * mProjection);
+            cb.mWorld = XMMatrixTranspose(mWorldBlock);
+            m_context->UpdateSubresource(m_constantBuffer.Get(), 0, NULL, &cb, 0, 0);
+
+            m_blocks[type].Draw(m_context.Get());
+        }
+
+        // --- ③ 盤面に固定されたブロック群の描画 ---
+        for (int r = 0; r < BOARD_HEIGHT; ++r) {
+            for (int c = 0; c < BOARD_WIDTH; ++c) {
+                int blockType = current_player->m_board.GetBlockType(c, r);
+                if (blockType != -1) {
+                    float posX = current_player->m_board.GetX(c, r);
+                    float posY = current_player->m_board.GetY(r);
+
+                    XMMATRIX mScaleBlock = XMMatrixScaling(m_scale, m_scale, m_scale);
+                    XMMATRIX mRotBlock = XMMatrixRotationY(m_angle);
+                    XMMATRIX mTransBlock = XMMatrixTranslation(posX, posY, 0.0f);
+                    XMMATRIX mWorldBlock = mScaleBlock * mRotBlock * mTransBlock;
+
+                    cb.vColor = blockColors[blockType];
+                    cb.mWorldViewProj = XMMatrixTranspose(mWorldBlock * mView * mProjection);
+                    cb.mWorld = XMMatrixTranspose(mWorldBlock);
+                    m_context->UpdateSubresource(m_constantBuffer.Get(), 0, NULL, &cb, 0, 0);
+
+                    m_blocks[blockType].Draw(m_context.Get());
+                }
+            }
+        }
+    } // forループの終わり（ここで次のプレイヤーの描画へ）
+
+    m_swapChain->Present(1, 0);
+}
 
 void Engine::Run() {
     MSG msg = { 0 };

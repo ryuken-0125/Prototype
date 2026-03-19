@@ -1,7 +1,15 @@
 #include "Board.h"
 #include <cmath>
 
-Board::Board() { Clear(); }
+Board::Board() : m_baseX(0.0f), m_baseY(0.0f) { Clear(); }
+
+
+void Board::Init(float baseX, float baseY) {
+    m_baseX = baseX;
+    m_baseY = baseY;
+    Clear();
+}
+
 
 void Board::Clear() {
     for (int r = 0; r < BOARD_HEIGHT; ++r) {
@@ -11,25 +19,21 @@ void Board::Clear() {
     }
 }
 
-// ★ここが互い違いの設計図です
+
 float Board::GetX(int col, int row) const {
-    float x = BASE_X + col * (BLOCK_RADIUS * 2.0f);
-    // 奇数段目（1, 3, 5...段目）は右にボール半分(RADIUS)だけズラす
-    if (row % 2 != 0) {
-        x += BLOCK_RADIUS;
-    }
+    float x = m_baseX + col * (BLOCK_RADIUS * 2.0f); // ★変更
+    if (row % 2 != 0) { x += BLOCK_RADIUS; }
     return x;
 }
 
 float Board::GetY(int row) const {
-    // ヘックスグリッドの縦の重なり幅は 半径 × √3 です
-    return BASE_Y + row * (BLOCK_RADIUS * 1.73205f);
+    return m_baseY + row * (BLOCK_RADIUS * 1.73205f); // ★変更
 }
 
 // ★四角形ではなく「ボール同士の距離」で当たり判定を行います
 bool Board::IsCollision(float x, float nextY) const {
-    // 1. 床との当たり判定
-    if (nextY <= BASE_Y) return true;
+	// 1. 床との当たり判定（ボールの中心が床に触れたら衝突とみなす）
+    if (nextY <= m_baseY) return true;
 
     // 2. 他のボールとの当たり判定（三平方の定理で距離を測る）
     for (int r = 0; r < BOARD_HEIGHT; ++r) {
