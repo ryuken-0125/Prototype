@@ -33,8 +33,8 @@ void Player::SpawnRandomBlock(bool isCPU) {
 
     // ★CPUの場合、「どの列に落とすか」を出現時に決めて記憶しておく（AIの思考）
     if (isCPU) {
-        // 今は完全にランダムな列を目標にする（後でここを「同じ色の場所を探す」など賢くできます）
-        m_cpuTargetCol = colDist(gen);
+
+        DecideCPUTarget(randomType);
     }
 }
 
@@ -105,4 +105,65 @@ void Player::Update(int leftKey, int rightKey, int downKey, bool isCPU) {
     else {
         SpawnRandomBlock(isCPU);
     }
+}
+
+
+void Player::DecideCPUTarget(int targetType) {
+    int bestCol = 0;
+    int maxScore = -9999; // 最初はあり得ない低い点数にしておく
+
+    // 0列目から8列目まで、すべての列をシミュレーション（採点）する
+    for (int c = 0; c < BOARD_WIDTH; ++c) {
+        int score = 0;
+
+        // この列で「一番上にあるブロック」が何段目(row)にあるかを探す
+        int topRow = -1;
+        for (int r = BOARD_HEIGHT - 1; r >= 0; --r) {
+            if (m_board.GetBlockType(c, r) != -1) {
+                topRow = r;
+                break; // 見つけたらループを抜ける
+            }
+        }
+
+        // --- ここから AI の「採点（評価）」 ---
+
+        // 1. 高さのペナルティ（ゲームオーバーを避けるため、高い場所には落としたくない）
+        if (topRow >= BOARD_HEIGHT - 2) {
+            score -= 1000; // 限界ギリギリの列には絶対落とさないように大減点
+        }
+        else {
+            score -= topRow; // 高ければ高いほど少しマイナスにする（低い谷間を好むようになる）
+        }
+
+        // 2. 色のボーナス（落とした時に、周りに同じ色があるか？）
+        // 着地するであろう場所(topRowの1つ上)の周りをチェックします
+
+        // 真下のブロックが同じ色か？
+        if (topRow >= 0 && m_board.GetBlockType(c, topRow) == targetType) {
+            score += 50; // 同じ色の上に乗るなら超高得点！
+        }
+
+        // 左側のブロックが同じ色か？
+        if (c > 0) {
+            if (topRow >= 0 && m_board.GetBlockType(c - 1, topRow) == targetType) score += 20;
+            if (topRow + 1 < BOARD_HEIGHT && m_board.GetBlockType(c - 1, topRow + 1) == targetType) score += 20;
+        }
+
+        // 右側のブロックが同じ色か？
+        if (c < BOARD_WIDTH - 1) {
+            if (topRow >= 0 && m_board.GetBlockType(c + 1, topRow) == targetType) score += 20;
+            if (topRow + 1 < BOARD_HEIGHT && m_board.GetBlockType(c + 1, topRow + 1) == targetType) score += 20;
+        }
+
+        // --- 採点終了 ---
+
+        // この列の点数が、今までの最高得点を超えていたら、そこをターゲットの候補にする
+        if (score > maxScore) {
+            maxScore = score;
+            bestCol = c;
+        }
+    }
+
+    // 全ての列をチェックし終わった後、一番点数の高かった列を最終決定とする
+    m_cpuTargetCol = bestCol;
 }

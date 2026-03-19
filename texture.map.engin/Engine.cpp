@@ -9,6 +9,10 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "xinput.lib") //コントローラー用
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3dcompiler.lib")
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
@@ -179,8 +183,23 @@ bool Engine::InitScene() {
     m_player1.Init(-5.4f, 0.0f); // 変更：-4.0f から -5.4f へ
     m_player2.Init(0.6f, 0.0f); // 変更： 2.0f から  0.6f へ
 
+
+        //追加: 2D描画ツールの初期化
+    m_spriteBatch = std::make_unique<DirectX::SpriteBatch>(m_context.Get());
+
+    //追加: タイトル画面のUI画像を読み込む
+    // （パスはご自身が用意した画像ファイルの場所に書き換えてください）
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/title_bg.jpg", nullptr, &m_texTitleBg);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/cpu.jpg", nullptr, &m_texBtnCpu);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/2p.jpg", nullptr, &m_texBtn2P);
+
+    //追加: シーンの初期状態を設定
+    m_currentScene = Scene::TITLE;
+    m_menuCursor = 0; // 最初は上のボタンを選択状態にする
+
     return true;
 }
+
 
 
 
@@ -307,14 +326,13 @@ void Engine::Update() {
 
 */
 
-void Engine::Update() 
-{
-    // プレイヤー1の更新 (A, D, Sキーで操作、CPUではない=false)
-    m_player1.Update('A', 'D', 'S', false);
-
-    // プレイヤー2の更新 (矢印キーで操作、CPUモード=true)
-    // ★ ここを false にすれば「友達と2人プレイ」、true にすれば「CPU対戦」になります！
-    m_player2.Update(VK_LEFT, VK_RIGHT, VK_DOWN, true);
+void Engine::Update() {
+    if (m_currentScene == Scene::TITLE) {
+        UpdateTitle();
+    }
+    else if (m_currentScene == Scene::GAME) {
+        UpdateGame();
+    }
 }
 
 
@@ -454,6 +472,22 @@ void Engine::Draw() {
 */
 
 void Engine::Draw() {
+    float clearColor[4] = { 0.0f, 0.2f, 0.4f, 1.0f }; // 背景色
+    m_context->ClearRenderTargetView(m_renderTargetView.Get(), clearColor);
+    m_context->ClearDepthStencilView(m_depthStencilView.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+    m_context->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), m_depthStencilView.Get());
+
+    if (m_currentScene == Scene::TITLE) {
+        DrawTitle();
+    }
+    else if (m_currentScene == Scene::GAME) {
+        DrawGame();
+    }
+
+    m_swapChain->Present(1, 0);
+}
+
+void Engine::DrawGame() {
     float clearColor[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
     m_context->ClearRenderTargetView(m_renderTargetView.Get(), clearColor);
     m_context->ClearDepthStencilView(m_depthStencilView.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
@@ -549,6 +583,13 @@ void Engine::Draw() {
     m_swapChain->Present(1, 0);
 }
 
+void Engine::UpdateGame() {
+    // === 元の Update() の中身をそのままここに移動させてください ===
+    m_player1.Update('A', 'D', 'S', false);
+    // m_isCpuMatch 変数を使って対戦相手を切り替える！
+    m_player2.Update(VK_LEFT, VK_RIGHT, VK_DOWN, m_isCpuMatch);
+}
+
 void Engine::Run() {
     MSG msg = { 0 };
     while (msg.message != WM_QUIT) {
@@ -560,4 +601,90 @@ void Engine::Run() {
             Draw();   // 画面の描画
         }
     }
+}
+
+void Engine::UpdateTitle() {
+    // --- 1. コントローラー（XInput）の処理 ---
+    XINPUT_STATE xState;
+    ZeroMemory(&xState, sizeof(XINPUT_STATE));
+    bool isDecided = false;
+
+    // コントローラーが接続されているか確認
+    if (XInputGetState(0, &xState) == ERROR_SUCCESS) {
+        // 十字キーの上下でカーソル移動（1回押し判定のための簡易処理）
+        static WORD lastButtons = 0;
+        WORD currentButtons = xState.Gamepad.wButtons;
+
+        if ((currentButtons & XINPUT_GAMEPAD_DPAD_UP) && !(lastButtons & XINPUT_GAMEPAD_DPAD_UP)) {
+            m_menuCursor = 0; // CPU対戦
+        }
+        if ((currentButtons & XINPUT_GAMEPAD_DPAD_DOWN) && !(lastButtons & XINPUT_GAMEPAD_DPAD_DOWN)) {
+            m_menuCursor = 1; // 2人対戦
+        }
+        // Aボタン（PS4の✕ボタンに相当）で決定
+        if ((currentButtons & XINPUT_GAMEPAD_A) && !(lastButtons & XINPUT_GAMEPAD_A)) {
+            isDecided = true;
+        }
+        lastButtons = currentButtons;
+    }
+
+    // --- 2. マウスの処理 ---
+    POINT cursorPos;
+    GetCursorPos(&cursorPos);
+    ScreenToClient(m_hwnd, &cursorPos); // ウィンドウ内の座標に変換
+
+    // ボタンの当たり判定（画像の配置位置に合わせて調整してください）
+    // 仮として、画面中央付近の座標を設定しています
+    RECT rectCpu = { m_width / 2 - 150, m_height / 2 - 50, m_width / 2 + 150, m_height / 2 + 20 };
+    RECT rect2P = { m_width / 2 - 150, m_height / 2 + 50, m_width / 2 + 150, m_height / 2 + 120 };
+
+    // マウスがボタンの上に乗ったらカーソルを合わせる
+    if (PtInRect(&rectCpu, cursorPos)) m_menuCursor = 0;
+    if (PtInRect(&rect2P, cursorPos))  m_menuCursor = 1;
+
+    // 左クリック（1回押し）判定
+    static bool isMousePressed = false;
+    if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) {
+        if (!isMousePressed && (PtInRect(&rectCpu, cursorPos) || PtInRect(&rect2P, cursorPos))) {
+            isDecided = true;
+        }
+        isMousePressed = true;
+    }
+    else {
+        isMousePressed = false;
+    }
+
+    // --- 3. 決定された場合のシーン遷移 ---
+    if (isDecided) {
+        m_isCpuMatch = (m_menuCursor == 0); // 0ならCPU戦、1なら2人プレイ
+        m_currentScene = Scene::GAME;       // ゲームシーンへ移行！
+    }
+}
+
+void Engine::DrawTitle() {
+    // 2D描画モード開始
+    m_spriteBatch->Begin();
+
+    // 背景の描画 (画面全体)
+    if (m_texTitleBg) {
+        RECT bgRect = { 0, 0, m_width, m_height };
+        m_spriteBatch->Draw(m_texTitleBg.Get(), bgRect, Colors::White);
+    }
+
+    // ボタンの色（選択されているボタンは白、選択されていない方は少し暗くする）
+    XMVECTORF32 colorCpu = (m_menuCursor == 0) ? Colors::White : Colors::Gray;
+    XMVECTORF32 color2P = (m_menuCursor == 1) ? Colors::White : Colors::Gray;
+
+    // ボタンの描画（位置はUpdateTitleの当たり判定RECTに合わせています）
+    if (m_texBtnCpu) {
+        RECT btnCpuRect = { m_width / 2 - 150, m_height / 2 - 50, m_width / 2 + 150, m_height / 2 + 20 };
+        m_spriteBatch->Draw(m_texBtnCpu.Get(), btnCpuRect, colorCpu);
+    }
+    if (m_texBtn2P) {
+        RECT btn2PRect = { m_width / 2 - 150, m_height / 2 + 50, m_width / 2 + 150, m_height / 2 + 120 };
+        m_spriteBatch->Draw(m_texBtn2P.Get(), btn2PRect, color2P);
+    }
+
+    // 2D描画モード終了
+    m_spriteBatch->End();
 }

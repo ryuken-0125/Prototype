@@ -27,4 +27,7 @@ private:
 
     // CPU（AI）用の変数
     int m_cpuTargetCol;
+
+    //「どの列に落とすか」を考えて決定する関数
+    void DecideCPUTarget(int targetType);
 };

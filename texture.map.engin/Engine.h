@@ -6,7 +6,9 @@
 #include <wrl/client.h>
 #include <WICTextureLoader.h> //画像読み込み用ヘッダー
 #include <random> // 乱数生成用
-
+#include <memory>
+#include <SpriteBatch.h> // 2D画像描画用
+#include <Xinput.h>      // コントローラー入力用
 
 
 #include "Mesh.h"
@@ -14,7 +16,10 @@
 #include "Board.h"
 #include "Player.h"
 
-
+enum class Scene {
+    TITLE,  // タイトル画面
+    GAME    // ゲーム画面
+};
 
 // 頂点と定数バッファの構造体
 // 頂点は位置と色を持ち、定数バッファはワールドビュー射影行列を持つ。これらはシェーダーで使用されるデータ構造で、頂点バッファや定数バッファに転送される。
@@ -77,6 +82,12 @@ private:
     // 3Dモデルのスケール（大きさ）
     float m_scale;
 
+    Scene m_currentScene; // 現在のシーン
+    bool m_isCpuMatch;    // CPU対戦かどうか
+    int m_menuCursor;     // コントローラー用のカーソル位置（0: CPU対戦, 1: 2人対戦）
+
+    std::unique_ptr<DirectX::SpriteBatch> m_spriteBatch;
+
     // DirectX関連のリソース（ComPtrで自動メモリ管理し、軽量化と安全性を両立）
     Microsoft::WRL::ComPtr<ID3D11Device> m_device;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
@@ -100,7 +111,18 @@ private:
     //深度バッファ（奥のものを隠すためのデータ）
     Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_depthStencilView;
 
+    // タイトル画面用の画像（テクスチャ）
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_texTitleBg;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_texBtnCpu;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_texBtn2P;
+
    // int m_waitTimer; // アニメーション待機用タイマー
 
     float m_angle; // 回転角度
+
+    void UpdateTitle();
+    void UpdateGame();
+    void DrawTitle();
+    void DrawGame();
+
 };
