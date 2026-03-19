@@ -59,12 +59,12 @@ void Player::Update(int leftKey, int rightKey, int downKey, bool isCPU) {
         if (!isCPU) {
             // 人間のキーボード操作
             if (GetAsyncKeyState(leftKey) & 0x8000) {
-                if (!m_isLeftPressed) { m_fallingBlock.SetX(m_fallingBlock.GetX() - BLOCK_RADIUS * 2.0f); m_isLeftPressed = true; }
+                if (!m_isLeftPressed) { m_fallingBlock.SetX(m_fallingBlock.GetX() - BLOCK_RADIUS * 1.0f); m_isLeftPressed = true; }
             }
             else { m_isLeftPressed = false; }
 
             if (GetAsyncKeyState(rightKey) & 0x8000) {
-                if (!m_isRightPressed) { m_fallingBlock.SetX(m_fallingBlock.GetX() + BLOCK_RADIUS * 2.0f); m_isRightPressed = true; }
+                if (!m_isRightPressed) { m_fallingBlock.SetX(m_fallingBlock.GetX() + BLOCK_RADIUS * 1.0f); m_isRightPressed = true; }
             }
             else { m_isRightPressed = false; }
 
@@ -76,10 +76,10 @@ void Player::Update(int leftKey, int rightKey, int downKey, bool isCPU) {
             float targetX = m_board.GetX(m_cpuTargetCol, BOARD_HEIGHT - 1);
             // ターゲットのX座標に向けて自動で移動させる
             if (m_fallingBlock.GetX() < targetX - 0.1f) {
-                m_fallingBlock.SetX(m_fallingBlock.GetX() + BLOCK_RADIUS * 2.0f);
+                m_fallingBlock.SetX(m_fallingBlock.GetX() + BLOCK_RADIUS * 1.0f);
             }
             else if (m_fallingBlock.GetX() > targetX + 0.1f) {
-                m_fallingBlock.SetX(m_fallingBlock.GetX() - BLOCK_RADIUS * 2.0f);
+                m_fallingBlock.SetX(m_fallingBlock.GetX() - BLOCK_RADIUS * 1.0f);
             }
             else {
                 // 目的の列に着いたら、高速落下する（下キー長押しと同じ）
@@ -89,7 +89,7 @@ void Player::Update(int leftKey, int rightKey, int downKey, bool isCPU) {
 
         // はみ出し防止と落下処理
         if (m_fallingBlock.GetX() < m_baseX) m_fallingBlock.SetX(m_baseX);
-        if (m_fallingBlock.GetX() > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingBlock.SetX(m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f));
+        if (m_fallingBlock.GetX() > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingBlock.SetX(m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 1.0f));
 
         float nextY = m_fallingBlock.GetY() - speed;
 

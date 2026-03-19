@@ -4,7 +4,9 @@
 
 #include <d3dcompiler.h>
 #include <random> // 乱数生成用
-
+#include <chrono>
+#include <string>
+#include <thread>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -487,6 +489,7 @@ void Engine::Draw() {
     m_swapChain->Present(1, 0);
 }
 
+
 void Engine::DrawGame() {
     float clearColor[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
     m_context->ClearRenderTargetView(m_renderTargetView.Get(), clearColor);
@@ -590,6 +593,7 @@ void Engine::UpdateGame() {
     m_player2.Update(VK_LEFT, VK_RIGHT, VK_DOWN, m_isCpuMatch);
 }
 
+/*
 void Engine::Run() {
     MSG msg = { 0 };
     while (msg.message != WM_QUIT) {
@@ -602,6 +606,64 @@ void Engine::Run() {
         }
     }
 }
+*/
+
+void Engine::Run() {
+    MSG msg = { 0 };
+
+    // --- FPS制御のための設定 ---
+    const double targetFPS = 60.0;
+    const double targetFrameTime = 1.0 / targetFPS; // 1フレームに割くべき時間（約0.00694秒）
+
+    // 時間計測用の変数（今の時間を記録）
+    auto prevTime = std::chrono::high_resolution_clock::now();
+    auto fpsUpdateTime = prevTime;
+    int frameCount = 0; // 1秒間に何回描画したかを数えるカウンター
+
+    while (msg.message != WM_QUIT) {
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else {
+            // 現在の時間を取得
+            auto currentTime = std::chrono::high_resolution_clock::now();
+
+            // 前回の描画から「何秒」経過したかを計算
+            std::chrono::duration<double> elapsedTime = currentTime - prevTime;
+
+            // 経過時間が目標フレーム時間（1/144秒）以上になったら、1フレーム分進める
+            if (elapsedTime.count() >= targetFrameTime) {
+                prevTime = currentTime; // 時間を更新
+
+                Update(); // データの更新
+                Draw();   // 画面の描画
+
+                // --- FPSの計算とウィンドウタイトルへの表示処理 ---
+                frameCount++;
+                std::chrono::duration<double> fpsElapsed = currentTime - fpsUpdateTime;
+
+                // もし1秒以上経過していたら、タイトルバーを更新する
+                if (fpsElapsed.count() >= 1.0) {
+                    // "sixball - FPS: 144" という文字列を作る
+                    std::wstring title = L"sixball - FPS: " + std::to_wstring(frameCount);
+
+                    // ウィンドウのタイトルを書き換える
+                    SetWindowText(m_hwnd, title.c_str());
+
+                    // カウンターと時間をリセットして、次の1秒の計測を始める
+                    frameCount = 0;
+                    fpsUpdateTime = currentTime;
+                }
+            }
+            else {
+                // まだ1/144秒経っていない場合は、PCの負荷を下げるためにCPUの処理を少し休ませる（譲る）
+                std::this_thread::yield();
+            }
+        }
+    }
+}
+
 
 void Engine::UpdateTitle() {
     // --- 1. コントローラー（XInput）の処理 ---
