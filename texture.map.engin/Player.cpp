@@ -52,62 +52,97 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
     if (m_waitTimer > 0) { m_waitTimer--; return generatedAttacks; }
     if (m_board.ApplyGravity()) { m_waitTimer = 8; return generatedAttacks; }
 
-    generatedAttacks = m_board.CheckAndErase();
-    if (!generatedAttacks.empty()) { m_waitTimer = 20; return generatedAttacks; }
+    // 消去判定と攻撃の増幅（前回実装した部分）
+    auto rawAttacks = m_board.CheckAndErase();
+    if (!rawAttacks.empty()) {
+        for (int a : rawAttacks) {
+            for (int i = 0; i < ATTACK_MULTIPLIER; ++i) {
+                generatedAttacks.push_back(a);
+            }
+        }
+        m_waitTimer = 20;
+        return generatedAttacks;
+    }
 
     // ==========================================================
-    // 1. 画面に降っている攻撃ブロックがあれば、それを最優先で落とす
+    // 1. 画面に降っている攻撃ブロック群の落下処理
     if (!m_activeAttacks.empty()) {
         auto it = m_activeAttacks.begin();
         float fallSpeed = 0.04f;
+        bool lockedAny = false; // 今回のフレームで着地したものがあったか
 
-        bool canFall = true;
-        for (int i = 0; i < it->GetBlockCount(); ++i) {
-            if (m_board.IsCollision(it->GetBlockX(i), it->GetBlockY(i) - fallSpeed)) {
-                canFall = false; break;
-            }
-        }
-
-        if (canFall) {
-            it->Update(fallSpeed);
-        }
-        else {
+        // 落下中の全ての攻撃ブロックを同時に動かす
+        while (it != m_activeAttacks.end()) {
+            bool canFall = true;
+            // 落下先に障害物がないかチェック
             for (int i = 0; i < it->GetBlockCount(); ++i) {
-                m_board.LockBlock(it->GetBlockX(i), it->GetBlockY(i), it->GetType(i));
+                if (m_board.IsCollision(it->GetBlockX(i), it->GetBlockY(i) - fallSpeed)) {
+                    canFall = false; break;
+                }
             }
-            m_activeAttacks.erase(it);
+
+            if (canFall) {
+                it->Update(fallSpeed); // 空中なら落とす
+                ++it;
+            }
+            else {
+                // 着地した攻撃ブロックだけを盤面にロックする
+                for (int i = 0; i < it->GetBlockCount(); ++i) {
+                    m_board.LockBlock(it->GetBlockX(i), it->GetBlockY(i), it->GetType(i));
+                }
+                it = m_activeAttacks.erase(it); // ロック完了したものはリストから消す
+                lockedAny = true;
+            }
+        }
+
+        // どれか1つでも着地したら少しウェイトをかけて連鎖判定を待つ
+        if (lockedAny) {
             m_waitTimer = 5;
         }
 
-        // ★攻撃ブロックが降っている間は、ここで処理を終えるためプレイヤーは動けない！
+        // 攻撃が降っている間はプレイヤーは操作不可！
         return generatedAttacks;
     }
     // ==========================================================
 
     // ==========================================================
-    // 2. プレイヤーのブロックがなく、かつ攻撃キューにストックがあれば、攻撃を出現させる
+    // 2. プレイヤーのブロックがなく、かつ攻撃キューにストックがあれば一気に出現させる
     if (!m_fallingGroup.IsActive()) {
         if (!m_attackQueue.empty()) {
-            int attackType = m_attackQueue.front();
-            m_attackQueue.erase(m_attackQueue.begin());
+
+            // ★いつでも変更可能: 連続して降ってくる攻撃の「縦の間隔」
+            // 数字を大きくすると間隔が広がり、小さくすると塊になってドサッと降ります。
+            float attackGapY = BLOCK_RADIUS * 7.0f;
+
+            // 1個目の攻撃の初期高度
+            float currentStartY = m_board.GetY(BOARD_HEIGHT + 2);
 
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_int_distribution<int> colDist(1, BOARD_WIDTH - 4);
 
-            float startX = m_board.GetX(colDist(gen), BOARD_HEIGHT - 1);
-            float startY = m_board.GetY(BOARD_HEIGHT + 2);
+            // キュー（待ち行列）に入っている攻撃を「すべて」一気に出現させる！
+            while (!m_attackQueue.empty()) {
+                int attackType = m_attackQueue.front();
+                m_attackQueue.erase(m_attackQueue.begin());
 
-            m_activeAttacks.push_back(Attack(attackType, startX, startY, BLOCK_RADIUS));
+                float startX = m_board.GetX(colDist(gen), BOARD_HEIGHT - 1);
 
-            return generatedAttacks; // ★出現させただけでこのフレームは終了
+                // 攻撃ブロックをリストに追加（Y座標はcurrentStartYを使う）
+                m_activeAttacks.push_back(Attack(attackType, startX, currentStartY, BLOCK_RADIUS));
+
+                // 次の攻撃は、前の攻撃よりもさらに「上空」に配置してズラす
+                currentStartY += attackGapY;
+            }
+
+            return generatedAttacks; // 出現させただけでこのフレームは終了
         }
         else {
-            // キューが空の時（平和な時）だけ、通常のブロックを生成してあげる
+            // 攻撃が何もない平和な時だけ、通常のブロックを生成してあげる
             SpawnRandomBlock(isCPU);
         }
     }
-    // ==========================================================
+     // ==========================================================
 
     // 3. プレイヤーの操作と落下処理（以前のまま）
     if (m_fallingGroup.IsActive()) {
@@ -170,242 +205,6 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
 
     return generatedAttacks;
 }
-
-/*
-std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rotateKey, bool isCPU) {
-    std::vector<int> generatedAttacks;
-
-    if (m_waitTimer > 0) { m_waitTimer--; return generatedAttacks; }
-    if (m_board.ApplyGravity()) { m_waitTimer = 8; return generatedAttacks; }
-
-    generatedAttacks = m_board.CheckAndErase();
-    if (!generatedAttacks.empty()) { m_waitTimer = 20; return generatedAttacks; }
-
-    // ==========================================================
-    // ★追加: 攻撃キューに溜まっているものがあれば、操作不可のAttackとして画面に出現させる
-    if (!m_attackQueue.empty()) {
-        int attackType = m_attackQueue.front();
-        m_attackQueue.erase(m_attackQueue.begin()); // キューから取り出す
-
-        // ランダムな列から降らせる
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        // はみ出さないように適度に列の範囲を絞る（攻撃の幅による）
-        std::uniform_int_distribution<int> colDist(1, BOARD_WIDTH - 4);
-
-        float startX = m_board.GetX(colDist(gen), BOARD_HEIGHT - 1);
-        float startY = m_board.GetY(BOARD_HEIGHT + 2); // 画面の見えない少し上から降らせる
-
-        // Attackオブジェクトを生成して、落下中リストに追加
-        m_activeAttacks.push_back(Attack(attackType, startX, startY, BLOCK_RADIUS));
-    }
-    // ==========================================================
-
-    // ==========================================================
-    // ★追加: 落下中の「操作不可の攻撃ブロック」の処理
-    auto it = m_activeAttacks.begin();
-    while (it != m_activeAttacks.end()) {
-        float fallSpeed = 0.04f; // お邪魔ブロックの落下速度（少し早め）
-
-        // 落下先がぶつかるかチェック
-        bool canFall = true;
-        for (int i = 0; i < it->GetBlockCount(); ++i) {
-            float bx = it->GetBlockX(i);
-            float nextBy = it->GetBlockY(i) - fallSpeed;
-            if (m_board.IsCollision(bx, nextBy)) { canFall = false; break; }
-        }
-
-        if (canFall) {
-            it->Update(fallSpeed); // ぶつからなければそのまま落下
-            ++it;
-        }
-        else {
-            // ぶつかったら盤面にロックする
-            for (int i = 0; i < it->GetBlockCount(); ++i) {
-                m_board.LockBlock(it->GetBlockX(i), it->GetBlockY(i), it->GetType(i));
-            }
-            // ロック完了したらリストから削除
-            it = m_activeAttacks.erase(it);
-
-            m_waitTimer = 5; // 着地時の余韻と、直後の連鎖判定のためのウェイト
-            return generatedAttacks; // 一旦ここで処理を区切る
-        }
-    }
-    // ==========================================================
-
-    if (m_fallingGroup.IsActive()) {
-        float speed = 0.01f;
-
-        if (!isCPU) {
-            // 人間の操作
-            if (GetAsyncKeyState(leftKey) & 0x8000) {
-                if (!m_isLeftPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f); m_isLeftPressed = true; }
-            }
-            else { m_isLeftPressed = false; }
-
-            if (GetAsyncKeyState(rightKey) & 0x8000) {
-                if (!m_isRightPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f); m_isRightPressed = true; }
-            }
-            else { m_isRightPressed = false; }
-
-            if (GetAsyncKeyState(downKey) & 0x8000) speed = 0.05f;
-
-            // =================================================================
-            // ★企画段階：回転機能
-            // 回転機能をオフ（位置変更なし）にしたい場合は、
-            // 以下の if (GetAsyncKeyState(rotateKey)... のブロックを 注釈で囲んでコメントアウトしてください。
-            if (GetAsyncKeyState(rotateKey) & 0x8000) {
-                if (!m_isRotatePressed) {
-                    m_fallingGroup.RotateClockwise();
-
-                    // 回転時に壁にめり込んだ場合、内側に押し戻す（壁蹴り処理）
-                    for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
-                        float bx = m_fallingGroup.GetBlockX(i);
-                        if (bx < m_baseX) m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f);
-                        if (bx > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f);
-                    }
-                    m_isRotatePressed = true;
-                }
-            }
-            else { m_isRotatePressed = false; }
-            // =================================================================
-
-        }
-        else {
-            // CPUの操作（そのまま変更なし）
-            float targetX = m_board.GetX(m_cpuTargetCol, BOARD_HEIGHT - 1);
-            if (m_fallingGroup.GetX() < targetX - 0.1f) {
-                m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f);
-            }
-            else if (m_fallingGroup.GetX() > targetX + 0.1f) {
-                m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f);
-            }
-            else { speed = 0.05f; }
-        }
-
-        // はみ出し防止（壁ドン）
-        if (m_fallingGroup.GetX() < m_baseX) m_fallingGroup.SetX(m_baseX);
-        if (m_fallingGroup.GetX() > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingGroup.SetX(m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f));
-
-        // ★修正: 落下判定。グループ内の「どれか1つでも」ぶつかったら止まる
-        bool canFall = true;
-        for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
-            float bx = m_fallingGroup.GetBlockX(i);
-            float nextBy = m_fallingGroup.GetBlockY(i) - speed;
-            if (m_board.IsCollision(bx, nextBy)) {
-                canFall = false;
-                break;
-            }
-        }
-
-        if (canFall) {
-            m_fallingGroup.SetY(m_fallingGroup.GetY() - speed);
-        }
-        else {
-            // ★修正: ぶつかったら、グループ全員を今の位置でロックする
-            for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
-                m_board.LockBlock(m_fallingGroup.GetBlockX(i), m_fallingGroup.GetBlockY(i), m_fallingGroup.GetType(i));
-            }
-            m_fallingGroup.SetInactive();
-            m_waitTimer = 5;
-            // （ロック後、空中に浮いたボールは次のフレームで ApplyGravity() によって自動的に下にスッポリ落ちます）
-        }
-    }
-    else {
-        SpawnRandomBlock(isCPU);
-    }
-}
-*/
-
-/*
-void Player::Update(int leftKey, int rightKey, int downKey, int rotateKey, bool isCPU) {
-    if (m_waitTimer > 0) { m_waitTimer--; return; }
-    if (m_board.ApplyGravity()) { m_waitTimer = 8; return; }
-    if (m_board.CheckAndErase()) { m_waitTimer = 20; return; }
-
-    if (m_fallingGroup.IsActive()) {
-        float speed = 0.01f;
-
-        if (!isCPU) {
-            // 人間の操作
-            if (GetAsyncKeyState(leftKey) & 0x8000) {
-                if (!m_isLeftPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f); m_isLeftPressed = true; }
-            }
-            else { m_isLeftPressed = false; }
-
-            if (GetAsyncKeyState(rightKey) & 0x8000) {
-                if (!m_isRightPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f); m_isRightPressed = true; }
-            }
-            else { m_isRightPressed = false; }
-
-            if (GetAsyncKeyState(downKey) & 0x8000) speed = 0.05f;
-
-            // =================================================================
-            // ★企画段階：回転機能
-            // 回転機能をオフ（位置変更なし）にしたい場合は、
-            // 以下の if (GetAsyncKeyState(rotateKey)... のブロックを 注釈 で囲んでコメントアウトしてください。
-            if (GetAsyncKeyState(rotateKey) & 0x8000) {
-                if (!m_isRotatePressed) {
-                    m_fallingGroup.RotateClockwise();
-
-                    // 回転時に壁にめり込んだ場合、内側に押し戻す（壁蹴り処理）
-                    for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
-                        float bx = m_fallingGroup.GetBlockX(i);
-                        if (bx < m_baseX) m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f);
-                        if (bx > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f);
-                    }
-                    m_isRotatePressed = true;
-                }
-            }
-            else { m_isRotatePressed = false; }
-            // =================================================================
-
-        }
-        else {
-            // CPUの操作（そのまま変更なし）
-            float targetX = m_board.GetX(m_cpuTargetCol, BOARD_HEIGHT - 1);
-            if (m_fallingGroup.GetX() < targetX - 0.1f) {
-                m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f);
-            }
-            else if (m_fallingGroup.GetX() > targetX + 0.1f) {
-                m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f);
-            }
-            else { speed = 0.05f; }
-        }
-
-        // はみ出し防止（壁ドン）
-        if (m_fallingGroup.GetX() < m_baseX) m_fallingGroup.SetX(m_baseX);
-        if (m_fallingGroup.GetX() > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingGroup.SetX(m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f));
-
-        // ★修正: 落下判定。グループ内の「どれか1つでも」ぶつかったら止まる
-        bool canFall = true;
-        for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
-            float bx = m_fallingGroup.GetBlockX(i);
-            float nextBy = m_fallingGroup.GetBlockY(i) - speed;
-            if (m_board.IsCollision(bx, nextBy)) {
-                canFall = false;
-                break;
-            }
-        }
-
-        if (canFall) {
-            m_fallingGroup.SetY(m_fallingGroup.GetY() - speed);
-        }
-        else {
-            // ★修正: ぶつかったら、グループ全員を今の位置でロックする
-            for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
-                m_board.LockBlock(m_fallingGroup.GetBlockX(i), m_fallingGroup.GetBlockY(i), m_fallingGroup.GetType(i));
-            }
-            m_fallingGroup.SetInactive();
-            m_waitTimer = 5;
-            // （ロック後、空中に浮いたボールは次のフレームで ApplyGravity() によって自動的に下にスッポリ落ちます）
-        }
-    }
-    else {
-        SpawnRandomBlock(isCPU);
-    }
-}
-*/
 
 void Player::DecideCPUTarget(int targetType) {
     int bestCol = 0;

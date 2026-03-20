@@ -42,8 +42,12 @@ private:
 
     const int FALLING_BLOCK_COUNT = 2; // ここを 3 にすれば3個になる
 
+    // ここを 4 にすれば、1回ストレートを作るだけで相手に4回連続でストレートが降ります。
+    const int ATTACK_MULTIPLIER = 3;
+
     // CPU（AI）用の変数
     int m_cpuTargetCol;
+
 
     //「どの列に落とすか」を考えて決定する関数
     void DecideCPUTarget(int targetType);
