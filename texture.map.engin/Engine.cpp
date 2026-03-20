@@ -8,6 +8,7 @@
 #include <chrono>
 #include <string>
 #include <thread>
+#include <windows.h>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -612,6 +613,24 @@ void Engine::UpdateGame() {
 
     // 2が攻撃したら、1のキューに入れる
     for (int a : attacks2) m_player1.AddAttack(a);
+
+    // ==========================================================
+    // 負け判定とタイトル画面へのループ処理
+    if (m_player1.IsGameOver() || m_player2.IsGameOver()) {
+        // どちらか片方でも負けた場合（一番上まで積み上がった場合）
+        // 
+        // 3秒間停止する
+        Sleep(3000);
+
+        // 次の対戦に備えて、両プレイヤーの盤面や攻撃をすべて綺麗にリセットする
+        m_player1.Reset();
+        m_player2.Reset();
+
+        // シーンを最初のタイトル画面に戻す
+        m_currentScene = Scene::TITLE;
+    }
+    // ==========================================================
+
 }
 
 /*

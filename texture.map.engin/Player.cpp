@@ -4,7 +4,8 @@
 
 
 Player::Player() : m_waitTimer(0), m_baseX(0.0f), m_baseY(0.0f),
-m_isLeftPressed(false), m_isRightPressed(false), m_isRotatePressed(false), m_cpuTargetCol(0) {
+m_isLeftPressed(false), m_isRightPressed(false), m_isRotatePressed(false), m_cpuTargetCol(0),
+m_isGameOver(false) { 
 }
 
 void Player::Init(float startX, float startY) {
@@ -12,6 +13,7 @@ void Player::Init(float startX, float startY) {
     m_baseY = startY;
     m_board.Init(startX, startY);
     m_waitTimer = 0;
+    m_isGameOver = false;
 }
 
 float Player::GetCenterX() const {
@@ -107,9 +109,20 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
 
     // ==========================================================
     // 2. プレイヤーのブロックがなく、かつ攻撃キューにストックがあれば一気に出現させる
-    if (!m_fallingGroup.IsActive()) {
-        if (!m_attackQueue.empty()) {
+    if (!m_fallingGroup.IsActive()) 
+    {
+        for (int c = 0; c < BOARD_WIDTH; ++c) 
+        {
+            // 一番上の段に1つでもブロックがあれば
+            if (m_board.GetBlockType(c, BOARD_HEIGHT - 1) != -1)
+            {
+                m_isGameOver = true; // 負け状態にする
+                return generatedAttacks; // 負けたので新しいボールは出さずに処理を終える
+            }
+        }
 
+        if (!m_attackQueue.empty())
+        {
             // ★いつでも変更可能: 連続して降ってくる攻撃の「縦の間隔」
             // 数字を大きくすると間隔が広がり、小さくすると塊になってドサッと降ります。
             float attackGapY = BLOCK_RADIUS * 7.0f;
@@ -141,6 +154,8 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
             // 攻撃が何もない平和な時だけ、通常のブロックを生成してあげる
             SpawnRandomBlock(isCPU);
         }
+
+
     }
      // ==========================================================
 
@@ -267,3 +282,25 @@ void Player::DecideCPUTarget(int targetType) {
 }
 
 
+
+// ==========================================================
+bool Player::IsGameOver() const {
+    return m_isGameOver;
+}
+
+// ==========================================================
+//盤面と状態の完全リセット
+void Player::Reset() {
+    m_board.Clear();              // 盤面をまっさらにする
+    m_fallingGroup.SetInactive(); // 落下中のボールを消す
+    m_activeAttacks.clear();      // 降っている途中のお邪魔ブロックを消去
+    m_attackQueue.clear();        // 待機中のお邪魔ブロックを消去
+    m_waitTimer = 0;              // アニメーションタイマーを初期化
+
+    // キー入力の押しっぱなし判定もリセット
+    m_isLeftPressed = false;
+    m_isRightPressed = false;
+    m_isRotatePressed = false;
+
+    m_isGameOver = false;
+}

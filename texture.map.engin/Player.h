@@ -22,6 +22,11 @@ public:
     float GetCenterX() const;
 
     void AddAttack(int attackType) { m_attackQueue.push_back(attackType); }
+    //一番上のラインを越えたか（負けたか）を判定する
+    bool IsGameOver() const;
+
+    // 次の対戦のために盤面や落下ブロックをすべて初期化する
+    void Reset();
 
     Board m_board;
     Block m_fallingBlock;
@@ -36,6 +41,7 @@ public:
 private:
     bool m_isLeftPressed;
     bool m_isRightPressed;
+    bool m_isGameOver;
 
     //FallingGroup m_fallingGroup;
     //bool m_isRotatePressed; // 回転キーの1回押し判定用
