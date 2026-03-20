@@ -1,15 +1,14 @@
 #include "Board.h"
 #include <cmath>
+#include <set>
 
 Board::Board() : m_baseX(0.0f), m_baseY(0.0f) { Clear(); }
-
 
 void Board::Init(float baseX, float baseY) {
     m_baseX = baseX;
     m_baseY = baseY;
     Clear();
 }
-
 
 void Board::Clear() {
     for (int r = 0; r < BOARD_HEIGHT; ++r) {
@@ -18,7 +17,6 @@ void Board::Clear() {
         }
     }
 }
-
 
 float Board::GetX(int col, int row) const {
     float x = m_baseX + col * (BLOCK_RADIUS * 2.0f); // ★変更
@@ -83,7 +81,7 @@ int Board::GetBlockType(int col, int row) const {
     return -1;
 }
 
-// --- 1. 指定したマスの「周囲6方向」の座標を取得する ---
+// --- 指定したマスの「周囲6方向」の座標を取得する ---
 void Board::GetNeighbors(int c, int r, std::vector<std::pair<int, int>>& neighbors) const {
     neighbors.clear();
     neighbors.push_back({ c - 1, r }); // 左
@@ -114,7 +112,22 @@ void Board::GetNeighbors(int c, int r, std::vector<std::pair<int, int>>& neighbo
     }
 }
 
-// --- 2. 深さ優先探索（DFS）による再帰的な連結チェック ---
+// 0=右, 1=右上, 2=左上, 3=左, 4=左下, 5=右下
+bool Board::GetHexNeighbor(int c, int r, int dir, int& nc, int& nr) const {
+    nc = c; nr = r;
+    if (dir == 0) { nc += 1; }
+    else if (dir == 3) { nc -= 1; }
+    else {
+        int odd = (r % 2 != 0) ? 1 : 0;
+        if (dir == 1) { nc = c + odd; nr = r + 1; }
+        else if (dir == 2) { nc = c - 1 + odd; nr = r + 1; }
+        else if (dir == 4) { nc = c - 1 + odd; nr = r - 1; }
+        else if (dir == 5) { nc = c + odd; nr = r - 1; }
+    }
+    return (nc >= 0 && nc < BOARD_WIDTH && nr >= 0 && nr < BOARD_HEIGHT);
+}
+
+// --- 深さ優先探索（DFS）による再帰的な連結チェック ---
 void Board::DFS(int c, int r, int type, std::vector<std::vector<bool>>& visited, std::vector<std::pair<int, int>>& connected) const {
     visited[r][c] = true;         // このマスを「探索済み」にする
     connected.push_back({ c, r });  // 繋がっているリストに追加
@@ -132,7 +145,7 @@ void Board::DFS(int c, int r, int type, std::vector<std::vector<bool>>& visited,
     }
 }
 
-// --- 3. 盤面全体を調べて消去する ---
+/*
 bool Board::CheckAndErase() {
     std::vector<std::vector<bool>> visited(BOARD_HEIGHT, std::vector<bool>(BOARD_WIDTH, false));
     bool erasedAny = false;
@@ -157,6 +170,88 @@ bool Board::CheckAndErase() {
         }
     }
     return erasedAny;
+}
+*/
+
+// --- 3. 盤面全体を調べて消去する ---
+std::vector<int> Board::CheckAndErase() {
+    std::vector<int> attacks;
+    std::set<std::pair<int, int>> toErase;
+    std::vector<std::vector<bool>> visited(BOARD_HEIGHT, std::vector<bool>(BOARD_WIDTH, false));
+
+    const int ERASE_COUNT = 6; // 6個以上で消える
+
+    for (int r = 0; r < BOARD_HEIGHT; ++r) {
+        for (int c = 0; c < BOARD_WIDTH; ++c) {
+            // まだ調べていないブロックがあればDFSで繋がっている数を数える
+            if (m_grid[r][c] != -1 && !visited[r][c]) {
+                std::vector<std::pair<int, int>> connected;
+                DFS(c, r, m_grid[r][c], visited, connected);
+
+                // 6個以上繋がっていた場合のみ、消去＆攻撃判定を行う
+                if (connected.size() >= ERASE_COUNT) {
+                    int color = m_grid[r][c];
+                    bool attackAdded = false;
+
+                    // この「消えるグループ」の中に、特定の形が含まれているかチェック
+                    for (auto& p : connected) {
+                        int bc = p.first;
+                        int br = p.second;
+                        int nc1, nr1, nc2, nr2, nc3, nr3, nc4, nr4, nc5, nr5;
+
+                        // ① 横4つのストレート
+                        if (!attackAdded &&
+                            GetHexNeighbor(bc, br, 0, nc1, nr1) && m_grid[nr1][nc1] == color &&
+                            GetHexNeighbor(nc1, nr1, 0, nc2, nr2) && m_grid[nr2][nc2] == color &&
+                            GetHexNeighbor(nc2, nr2, 0, nc3, nr3) && m_grid[nr3][nc3] == color) {
+                            attacks.push_back(1);
+                            attackAdded = true;
+                        }
+                        // ② 斜め4つのストレート (右上方向)
+                        else if (!attackAdded &&
+                            GetHexNeighbor(bc, br, 1, nc1, nr1) && m_grid[nr1][nc1] == color &&
+                            GetHexNeighbor(nc1, nr1, 1, nc2, nr2) && m_grid[nr2][nc2] == color &&
+                            GetHexNeighbor(nc2, nr2, 1, nc3, nr3) && m_grid[nr3][nc3] == color) {
+                            attacks.push_back(2);
+                            attackAdded = true;
+                        }
+                        // ③ ピラミッド (下3, 中2, 上1)
+                        else if (!attackAdded &&
+                            GetHexNeighbor(bc, br, 0, nc1, nr1) && m_grid[nr1][nc1] == color &&
+                            GetHexNeighbor(nc1, nr1, 0, nc2, nr2) && m_grid[nr2][nc2] == color &&
+                            GetHexNeighbor(bc, br, 1, nc3, nr3) && m_grid[nr3][nc3] == color &&
+                            GetHexNeighbor(nc3, nr3, 0, nc4, nr4) && m_grid[nr4][nc4] == color &&
+                            GetHexNeighbor(nc3, nr3, 1, nc5, nr5) && m_grid[nr5][nc5] == color) {
+                            attacks.push_back(3);
+                            attackAdded = true;
+                        }
+                        // ④ 逆ピラミッド (上3, 中2, 下1)
+                        else if (!attackAdded &&
+                            GetHexNeighbor(bc, br, 0, nc1, nr1) && m_grid[nr1][nc1] == color &&
+                            GetHexNeighbor(nc1, nr1, 0, nc2, nr2) && m_grid[nr2][nc2] == color &&
+                            GetHexNeighbor(bc, br, 5, nc3, nr3) && m_grid[nr3][nc3] == color &&
+                            GetHexNeighbor(nc3, nr3, 0, nc4, nr4) && m_grid[nr4][nc4] == color &&
+                            GetHexNeighbor(nc3, nr3, 5, nc5, nr5) && m_grid[nr5][nc5] == color) {
+                            attacks.push_back(4);
+                            attackAdded = true;
+                        }
+                    }
+
+                    // グループ全員を消去予定リストに追加
+                    for (auto& p : connected) {
+                        toErase.insert(p);
+                    }
+                }
+            }
+        }
+    }
+
+    // まとめて消去する
+    for (auto& p : toErase) {
+        m_grid[p.second][p.first] = -1;
+    }
+
+    return attacks;
 }
 
 // --- 4. 物理演算（空白へ滑り落ちる） ---

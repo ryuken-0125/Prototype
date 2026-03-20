@@ -72,15 +72,19 @@ public:
     float GetX(int col, int row) const;
     float GetY(int row) const;
     bool IsCollision(float x, float nextY) const;
-    bool CheckAndErase();
+   // bool CheckAndErase();
     bool ApplyGravity();
     void LockBlock(float x, float y, int type);
     int GetBlockType(int col, int row) const;
+
+    std::vector<int> CheckAndErase();
 
 private:
     float m_baseX; //Ç±ÇÃî’ñ ÇÃç∂â∫ÇÃXç¿ïW
     float m_baseY; //Ç±ÇÃî’ñ ÇÃç∂â∫ÇÃYç¿ïW
     int m_grid[BOARD_HEIGHT][BOARD_WIDTH];
+
+    bool GetHexNeighbor(int c, int r, int dir, int& nc, int& nr) const;
 
     void GetNeighbors(int c, int r, std::vector<std::pair<int, int>>& neighbors) const;
     void DFS(int c, int r, int type, std::vector<std::vector<bool>>& visited, std::vector<std::pair<int, int>>& connected) const;

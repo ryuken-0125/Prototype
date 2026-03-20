@@ -1,6 +1,7 @@
 ﻿#include "Engine.h"
 #include "Block.h"
-
+#include "Player.h"
+#include "Attack.h"
 
 #include <d3dcompiler.h>
 #include <random> // 乱数生成用
@@ -19,14 +20,11 @@
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
 
-
-
 // ウィンドウプロシージャ（OSのメッセージ受け取り）
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     if (uMsg == WM_DESTROY) { PostQuitMessage(0); return 0; }
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
-
 // コンストラクタでモデルの初期位置（原点）を設定
 Engine::Engine() : m_hwnd(nullptr), m_width(800), m_height(600), m_angle(0.0f),
 m_posX(0.0f), m_posY(0.0f), m_posZ(0.0f), m_scale(0.3f)
@@ -202,9 +200,6 @@ bool Engine::InitScene() {
     return true;
 }
 
-
-
-
 //void Engine::Update() {
 //    if (!m_fallingBlock.IsActive()) return;
 //
@@ -336,7 +331,6 @@ void Engine::Update() {
         UpdateGame();
     }
 }
-
 
 /*
 void Engine::SpawnRandomBlock() {
@@ -489,7 +483,6 @@ void Engine::Draw() {
     m_swapChain->Present(1, 0);
 }
 
-
 void Engine::DrawGame() {
     float clearColor[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
     m_context->ClearRenderTargetView(m_renderTargetView.Get(), clearColor);
@@ -543,22 +536,45 @@ void Engine::DrawGame() {
         m_frame.Draw(m_context.Get());
 
         // --- ② 落下中ブロックの描画 ---
-        if (current_player->m_fallingBlock.IsActive()) {
-            int type = current_player->m_fallingBlock.GetType();
+        // --- ② 落下中ブロックの描画 ---
+        if (current_player->m_fallingGroup.IsActive()) {
+            // グループ内のボールの数だけループして描画する
+            for (int i = 0; i < current_player->m_fallingGroup.GetBlockCount(); ++i) {
+                int type = current_player->m_fallingGroup.GetType(i);
 
-            XMMATRIX mScaleBlock = XMMatrixScaling(m_scale, m_scale, m_scale);
-            XMMATRIX mRotBlock = XMMatrixRotationY(m_angle);
-            XMMATRIX mTransBlock = XMMatrixTranslation(current_player->m_fallingBlock.GetX(), current_player->m_fallingBlock.GetY(), 0.0f);
-            XMMATRIX mWorldBlock = mScaleBlock * mRotBlock * mTransBlock;
+                XMMATRIX mScaleBlock = XMMatrixScaling(m_scale, m_scale, m_scale);
+                XMMATRIX mRotBlock = XMMatrixRotationY(m_angle);
+                // m_fallingBlock.GetX() ではなく、GetBlockX(i) を使う
+                XMMATRIX mTransBlock = XMMatrixTranslation(current_player->m_fallingGroup.GetBlockX(i), current_player->m_fallingGroup.GetBlockY(i), 0.0f);
+                XMMATRIX mWorldBlock = mScaleBlock * mRotBlock * mTransBlock;
 
-            cb.vColor = blockColors[type];
-            cb.mWorldViewProj = XMMatrixTranspose(mWorldBlock * mView * mProjection);
-            cb.mWorld = XMMatrixTranspose(mWorldBlock);
-            m_context->UpdateSubresource(m_constantBuffer.Get(), 0, NULL, &cb, 0, 0);
+                cb.vColor = blockColors[type];
+                cb.mWorldViewProj = XMMatrixTranspose(mWorldBlock * mView * mProjection);
+                cb.mWorld = XMMatrixTranspose(mWorldBlock);
+                m_context->UpdateSubresource(m_constantBuffer.Get(), 0, NULL, &cb, 0, 0);
 
-            m_blocks[type].Draw(m_context.Get());
+                m_blocks[type].Draw(m_context.Get());
+            }
         }
+        // ==========================================================
+        // ★追加: 操作不可の攻撃ブロック(Attack)群の描画
+        for (const auto& attack : current_player->GetActiveAttacks()) {
+            for (int i = 0; i < attack.GetBlockCount(); ++i) {
+                int type = attack.GetType(i);
 
+                XMMATRIX mScaleBlock = XMMatrixScaling(m_scale, m_scale, m_scale);
+                XMMATRIX mRotBlock = XMMatrixRotationY(m_angle);
+                XMMATRIX mTransBlock = XMMatrixTranslation(attack.GetBlockX(i), attack.GetBlockY(i), 0.0f);
+                XMMATRIX mWorldBlock = mScaleBlock * mRotBlock * mTransBlock;
+
+                cb.vColor = blockColors[type];
+                cb.mWorldViewProj = XMMatrixTranspose(mWorldBlock * mView * mProjection);
+                cb.mWorld = XMMatrixTranspose(mWorldBlock);
+                m_context->UpdateSubresource(m_constantBuffer.Get(), 0, NULL, &cb, 0, 0);
+
+                m_blocks[type].Draw(m_context.Get());
+            }
+        }
         // --- ③ 盤面に固定されたブロック群の描画 ---
         for (int r = 0; r < BOARD_HEIGHT; ++r) {
             for (int c = 0; c < BOARD_WIDTH; ++c) {
@@ -587,10 +603,15 @@ void Engine::DrawGame() {
 }
 
 void Engine::UpdateGame() {
-    // === 元の Update() の中身をそのままここに移動させてください ===
-    m_player1.Update('A', 'D', 'S', false);
-    // m_isCpuMatch 変数を使って対戦相手を切り替える！
-    m_player2.Update(VK_LEFT, VK_RIGHT, VK_DOWN, m_isCpuMatch);
+    // それぞれのプレイヤーを更新し、発生した「攻撃リスト」を受け取る
+    auto attacks1 = m_player1.Update('A', 'D', 'S', 'R', false);
+    auto attacks2 = m_player2.Update(VK_LEFT, VK_RIGHT, VK_DOWN, VK_UP, m_isCpuMatch);
+
+    // 1が攻撃したら、2のキューに入れる
+    for (int a : attacks1) m_player2.AddAttack(a);
+
+    // 2が攻撃したら、1のキューに入れる
+    for (int a : attacks2) m_player1.AddAttack(a);
 }
 
 /*
@@ -663,7 +684,6 @@ void Engine::Run() {
         }
     }
 }
-
 
 void Engine::UpdateTitle() {
     // --- 1. コントローラー（XInput）の処理 ---
