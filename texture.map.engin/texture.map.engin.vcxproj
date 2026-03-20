@@ -24,6 +24,7 @@
     <ProjectGuid>{c3202dd7-912b-4aa5-b9bd-e2ab05c07fe4}</ProjectGuid>
     <RootNamespace>texturemapengin</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>prototype</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
