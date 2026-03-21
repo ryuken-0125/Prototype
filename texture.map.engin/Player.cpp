@@ -5,7 +5,7 @@
 
 Player::Player() : m_waitTimer(0), m_baseX(0.0f), m_baseY(0.0f),
 m_isLeftPressed(false), m_isRightPressed(false), m_isRotatePressed(false), m_cpuTargetCol(0),
-m_isGameOver(false) { 
+m_isGameOver(false), m_isDummyMode(false) { // 
 }
 
 void Player::Init(float startX, float startY) {
@@ -45,8 +45,6 @@ void Player::SpawnRandomBlock(bool isCPU)
         DecideCPUTarget(types[0]);
     }
 }
-
-// Player.cpp の Update() をまるごと差し替え
 
 std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rotateKey, bool isCPU) {
     std::vector<int> generatedAttacks;
@@ -109,9 +107,9 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
 
     // ==========================================================
     // 2. プレイヤーのブロックがなく、かつ攻撃キューにストックがあれば一気に出現させる
-    if (!m_fallingGroup.IsActive()) 
+    if (!m_fallingGroup.IsActive())
     {
-        for (int c = 0; c < BOARD_WIDTH; ++c) 
+        for (int c = 0; c < BOARD_WIDTH; ++c)
         {
             // 一番上の段に1つでもブロックがあれば
             if (m_board.GetBlockType(c, BOARD_HEIGHT - 1) != -1)
@@ -123,7 +121,7 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
 
         if (!m_attackQueue.empty())
         {
-            // ★いつでも変更可能: 連続して降ってくる攻撃の「縦の間隔」
+            //連続して降ってくる攻撃の「縦の間隔」
             // 数字を大きくすると間隔が広がり、小さくすると塊になってドサッと降ります。
             float attackGapY = BLOCK_RADIUS * 7.0f;
 
@@ -151,74 +149,76 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
             return generatedAttacks; // 出現させただけでこのフレームは終了
         }
         else {
-            // 攻撃が何もない平和な時だけ、通常のブロックを生成してあげる
-            SpawnRandomBlock(isCPU);
+            //攻撃が何もなく、かつダミーモード「ではない」時だけボールを生成する
+            if (!m_isDummyMode) {
+                SpawnRandomBlock(isCPU);
+            }
+
+
         }
+        // ==========================================================
 
+       // 3. プレイヤーの操作と落下処理（以前のまま）
+        if (m_fallingGroup.IsActive()) {
+            float speed = 0.01f;
 
-    }
-     // ==========================================================
-
-    // 3. プレイヤーの操作と落下処理（以前のまま）
-    if (m_fallingGroup.IsActive()) {
-        float speed = 0.01f;
-
-        if (!isCPU) {
-            if (GetAsyncKeyState(leftKey) & 0x8000) {
-                if (!m_isLeftPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f); m_isLeftPressed = true; }
-            }
-            else { m_isLeftPressed = false; }
-
-            if (GetAsyncKeyState(rightKey) & 0x8000) {
-                if (!m_isRightPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f); m_isRightPressed = true; }
-            }
-            else { m_isRightPressed = false; }
-
-            if (GetAsyncKeyState(downKey) & 0x8000) speed = 0.05f;
-
-            if (GetAsyncKeyState(rotateKey) & 0x8000) {
-                if (!m_isRotatePressed) {
-                    m_fallingGroup.RotateClockwise();
-                    for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
-                        float bx = m_fallingGroup.GetBlockX(i);
-                        if (bx < m_baseX) m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f);
-                        if (bx > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f);
-                    }
-                    m_isRotatePressed = true;
+            if (!isCPU) {
+                if (GetAsyncKeyState(leftKey) & 0x8000) {
+                    if (!m_isLeftPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f); m_isLeftPressed = true; }
                 }
+                else { m_isLeftPressed = false; }
+
+                if (GetAsyncKeyState(rightKey) & 0x8000) {
+                    if (!m_isRightPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f); m_isRightPressed = true; }
+                }
+                else { m_isRightPressed = false; }
+
+                if (GetAsyncKeyState(downKey) & 0x8000) speed = 0.05f;
+
+                if (GetAsyncKeyState(rotateKey) & 0x8000) {
+                    if (!m_isRotatePressed) {
+                        m_fallingGroup.RotateClockwise();
+                        for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
+                            float bx = m_fallingGroup.GetBlockX(i);
+                            if (bx < m_baseX) m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f);
+                            if (bx > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f);
+                        }
+                        m_isRotatePressed = true;
+                    }
+                }
+                else { m_isRotatePressed = false; }
             }
-            else { m_isRotatePressed = false; }
-        }
-        else {
-            float targetX = m_board.GetX(m_cpuTargetCol, BOARD_HEIGHT - 1);
-            if (m_fallingGroup.GetX() < targetX - 0.1f) { m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f); }
-            else if (m_fallingGroup.GetX() > targetX + 0.1f) { m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f); }
-            else { speed = 0.05f; }
-        }
+            else {
+                float targetX = m_board.GetX(m_cpuTargetCol, BOARD_HEIGHT - 1);
+                if (m_fallingGroup.GetX() < targetX - 0.1f) { m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f); }
+                else if (m_fallingGroup.GetX() > targetX + 0.1f) { m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f); }
+                else { speed = 0.05f; }
+            }
 
-        if (m_fallingGroup.GetX() < m_baseX) m_fallingGroup.SetX(m_baseX);
-        if (m_fallingGroup.GetX() > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingGroup.SetX(m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f));
+            if (m_fallingGroup.GetX() < m_baseX) m_fallingGroup.SetX(m_baseX);
+            if (m_fallingGroup.GetX() > m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f)) m_fallingGroup.SetX(m_baseX + (BOARD_WIDTH - 1) * (BLOCK_RADIUS * 2.0f));
 
-        bool canFall = true;
-        for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
-            float bx = m_fallingGroup.GetBlockX(i);
-            float nextBy = m_fallingGroup.GetBlockY(i) - speed;
-            if (m_board.IsCollision(bx, nextBy)) { canFall = false; break; }
-        }
-
-        if (canFall) {
-            m_fallingGroup.SetY(m_fallingGroup.GetY() - speed);
-        }
-        else {
+            bool canFall = true;
             for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
-                m_board.LockBlock(m_fallingGroup.GetBlockX(i), m_fallingGroup.GetBlockY(i), m_fallingGroup.GetType(i));
+                float bx = m_fallingGroup.GetBlockX(i);
+                float nextBy = m_fallingGroup.GetBlockY(i) - speed;
+                if (m_board.IsCollision(bx, nextBy)) { canFall = false; break; }
             }
-            m_fallingGroup.SetInactive();
-            m_waitTimer = 5;
-        }
-    }
 
-    return generatedAttacks;
+            if (canFall) {
+                m_fallingGroup.SetY(m_fallingGroup.GetY() - speed);
+            }
+            else {
+                for (int i = 0; i < m_fallingGroup.GetBlockCount(); ++i) {
+                    m_board.LockBlock(m_fallingGroup.GetBlockX(i), m_fallingGroup.GetBlockY(i), m_fallingGroup.GetType(i));
+                }
+                m_fallingGroup.SetInactive();
+                m_waitTimer = 5;
+            }
+        }
+
+        return generatedAttacks;
+    }
 }
 
 void Player::DecideCPUTarget(int targetType) {
@@ -281,8 +281,6 @@ void Player::DecideCPUTarget(int targetType) {
     m_cpuTargetCol = bestCol;
 }
 
-
-
 // ==========================================================
 bool Player::IsGameOver() const {
     return m_isGameOver;
@@ -302,5 +300,7 @@ void Player::Reset() {
     m_isRightPressed = false;
     m_isRotatePressed = false;
 
-    m_isGameOver = false;
+    //状態フラグの強制リセット
+    m_isGameOver = false;  // 負け判定を解除
+    m_isDummyMode = false; // ダミーモードを強制解除（自分でボールを出すようにする）
 }

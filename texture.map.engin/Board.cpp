@@ -19,13 +19,13 @@ void Board::Clear() {
 }
 
 float Board::GetX(int col, int row) const {
-    float x = m_baseX + col * (BLOCK_RADIUS * 2.0f); // ★変更
+    float x = m_baseX + col * (BLOCK_RADIUS * 2.0f); //
     if (row % 2 != 0) { x += BLOCK_RADIUS; }
     return x;
 }
 
 float Board::GetY(int row) const {
-    return m_baseY + row * (BLOCK_RADIUS * 1.73205f); // ★変更
+    return m_baseY + row * (BLOCK_RADIUS * 1.73205f); //
 }
 
 // ★四角形ではなく「ボール同士の距離」で当たり判定を行います
@@ -145,35 +145,8 @@ void Board::DFS(int c, int r, int type, std::vector<std::vector<bool>>& visited,
     }
 }
 
-/*
-bool Board::CheckAndErase() {
-    std::vector<std::vector<bool>> visited(BOARD_HEIGHT, std::vector<bool>(BOARD_WIDTH, false));
-    bool erasedAny = false;
 
-    // シックスボールパズルなので「6個」繋がったら消す（テスト時は 3 などに減らしてもOK）
-    const int ERASE_COUNT = 6;
-
-    for (int r = 0; r < BOARD_HEIGHT; ++r) {
-        for (int c = 0; c < BOARD_WIDTH; ++c) {
-            if (m_grid[r][c] != -1 && !visited[r][c]) {
-                std::vector<std::pair<int, int>> connected;
-                DFS(c, r, m_grid[r][c], visited, connected); // ここでDFS発動
-
-                // 条件を満たしたら盤面から消す
-                if (connected.size() >= ERASE_COUNT) {
-                    for (auto& p : connected) {
-                        m_grid[p.second][p.first] = -1;
-                    }
-                    erasedAny = true;
-                }
-            }
-        }
-    }
-    return erasedAny;
-}
-*/
-
-// --- 3. 盤面全体を調べて消去する ---
+// --- 盤面全体を調べて消去する ---
 std::vector<int> Board::CheckAndErase() {
     std::vector<int> attacks;
     std::set<std::pair<int, int>> toErase;

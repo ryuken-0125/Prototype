@@ -15,10 +15,12 @@
 #include "Block.h"
 #include "Board.h"
 #include "Player.h"
+#include "Tutorial.h"
 
 enum class Scene {
     TITLE,  // タイトル画面
-    GAME    // ゲーム画面
+    GAME,    // ゲーム画面
+    TUTORIAL
 };
 
 // 頂点と定数バッファの構造体
@@ -116,6 +118,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_texBtnCpu;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_texBtn2P;
 
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_texBtnTutorial; // タイトル画面用
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_texBtnBack;     // チュートリアル左下用
+
    // int m_waitTimer; // アニメーション待機用タイマー
 
     float m_angle; // 回転角度
@@ -124,5 +129,9 @@ private:
     void UpdateGame();
     void DrawTitle();
     void DrawGame();
+
+    Tutorial m_tutorial;
+    void UpdateTutorial();
+    void DrawTutorial();
 
 };

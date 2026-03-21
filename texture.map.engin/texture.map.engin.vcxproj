@@ -132,6 +132,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="Tutorial.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Attack.h" />
@@ -141,6 +142,7 @@
     <ClInclude Include="FallingGroup.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="Tutorial.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="BasicShader.hlsl">

@@ -28,6 +28,8 @@ public:
     // 次の対戦のために盤面や落下ブロックをすべて初期化する
     void Reset();
 
+    void SetDummyMode(bool isDummy) { m_isDummyMode = isDummy; }
+
     Board m_board;
     Block m_fallingBlock;
     int m_waitTimer;
@@ -41,8 +43,8 @@ public:
 private:
     bool m_isLeftPressed;
     bool m_isRightPressed;
-    bool m_isGameOver;
-
+    bool m_isGameOver = false;
+    bool m_isDummyMode = false;
     //FallingGroup m_fallingGroup;
     //bool m_isRotatePressed; // 回転キーの1回押し判定用
 
