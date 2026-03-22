@@ -9,7 +9,7 @@
 #include <memory>
 #include <SpriteBatch.h> // 2D画像描画用
 #include <Xinput.h>      // コントローラー入力用
-
+#include <SpriteFont.h>
 
 #include "Mesh.h"
 #include "Block.h"
@@ -89,6 +89,7 @@ private:
     int m_menuCursor;     // コントローラー用のカーソル位置（0: CPU対戦, 1: 2人対戦）
 
     std::unique_ptr<DirectX::SpriteBatch> m_spriteBatch;
+    std::unique_ptr<DirectX::SpriteFont> m_font;
 
     // DirectX関連のリソース（ComPtrで自動メモリ管理し、軽量化と安全性を両立）
     Microsoft::WRL::ComPtr<ID3D11Device> m_device;

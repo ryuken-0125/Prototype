@@ -194,6 +194,13 @@ bool Engine::InitScene() {
     CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/tutorial.png", nullptr, &m_texBtnTutorial);
     CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/back.png", nullptr, &m_texBtnBack);
  
+    try {
+        m_font = std::make_unique<DirectX::SpriteFont>(m_device.Get(), L"C:/DX11/sixball/asset/Font/AYASE.TTF");
+    }
+    catch (...) {
+        // ファイルがない場合は無視する（文字は出ないがゲームは動く）
+    }
+
     m_player1.Init(-5.4f, 0.0f);
     m_player2.Init(0.6f, 0.0f);
 
@@ -496,15 +503,9 @@ void Engine::UpdateTitle() {
     if (isDecided) {
         if (m_menuCursor == 0 || m_menuCursor == 1) {
 
-            // =========================================================
-            // ★追加: 対戦ゲームを始める前に、両プレイヤーの盤面などを完全に真っさらにする
-            m_player1.Reset();
-            m_player2.Reset();
-
-            // ★追加: 二人とも「ダミーではない（自分でボールを出す）」と明確に設定する
-            m_player1.SetDummyMode(false);
-            m_player2.SetDummyMode(false);
-            // =========================================================
+            // ★対戦開始時に「必ず」初期位置と初期状態をセットし直す
+            m_player1.Init(-5.4f, 0.0f);
+            m_player2.Init(0.6f, 0.0f);
 
             m_isCpuMatch = (m_menuCursor == 0);
             m_currentScene = Scene::GAME;
@@ -554,6 +555,11 @@ void Engine::DrawTitle() {
 void Engine::UpdateTutorial() {
     // チュートリアル本編の更新（キーボード操作を渡す）
     m_tutorial.Update('A', 'D', 'S', 'R');
+
+    if (m_tutorial.IsCompleted()) {
+        m_currentScene = Scene::TITLE;
+        return;
+    }   
 
     // 左下の「戻る」ボタンの判定
     POINT cursorPos;
@@ -654,6 +660,21 @@ void Engine::DrawTutorial() {
             }
         }
     }
+
+    // =========================================================
+        // チュートリアルのテキスト描画
+    if (m_font) {
+        // ★変更: 呼び出す関数の名前を変えます
+        std::wstring msg = m_tutorial.GetTutorialMessage();
+
+        if (!msg.empty()) {
+            DirectX::XMVECTOR origin = m_font->MeasureString(msg.c_str()) / 2.0f;
+            DirectX::XMVECTOR textPos = DirectX::XMVectorSet(m_width / 2.0f, 50.0f, 0.0f, 0.0f);
+
+            m_font->DrawString(m_spriteBatch.get(), msg.c_str(), textPos, DirectX::Colors::Yellow, 0.0f, origin, 1.0f);
+        }
+    }
+    // =========================================================
 
     // =========================================================
     // 【2D UIの描画（戻るボタンなど）】
