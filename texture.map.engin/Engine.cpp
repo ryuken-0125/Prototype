@@ -28,13 +28,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 // コンストラクタでモデルの初期位置（原点）を設定
 Engine::Engine() : m_hwnd(nullptr), m_width(800), m_height(600), m_angle(0.0f),
-m_posX(0.0f), m_posY(0.0f), m_posZ(0.0f), m_scale(0.3f)
+m_posX(0.0f), m_posY(0.0f), m_posZ(0.0f), m_scale(0.3f), m_blockScale(0.3f)
 { 
 
 }
 
 Engine::~Engine() {
     // ComPtrを使用しているため、明示的な解放処理は不要です（自動でクリーンアップされます）
+
 }
 
 bool Engine::Init(HINSTANCE hInstance, int width, int height) {
@@ -151,18 +152,25 @@ bool Engine::InitScene() {
     }
 
     //4つのブロックの読み込み（ファイルパスをご自身の環境に合わせて修正してください）
-    m_blocks[0].LoadModel(m_device.Get(), "asset/model/1.fbx");
-    m_blocks[1].LoadModel(m_device.Get(), "asset/model/2.fbx");
-    m_blocks[2].LoadModel(m_device.Get(), "asset/model/3l.fbx");
-    m_blocks[3].LoadModel(m_device.Get(), "asset/model/4.fbx");
-    m_blocks[4].LoadModel(m_device.Get(), "asset/model/5.fbx");
-    m_blocks[5].LoadModel(m_device.Get(), "asset/model/6.fbx");
-    m_blocks[6].LoadModel(m_device.Get(), "asset/model/7.fbx");
-    m_blocks[7].LoadModel(m_device.Get(), "asset/model/8.fbx");
+    m_blocks[0].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/aka.fbx");
+    m_blocks[1].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/ao.fbx");
+    m_blocks[2].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/siro.fbx");
+    m_blocks[3].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/pink.fbx");
+    m_blocks[4].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/murasaki.fbx"); 
+    m_blocks[5].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/mizuiro.fbx");
+
+
+    m_blocks[0].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
+    m_blocks[1].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
+    m_blocks[2].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
+    m_blocks[3].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
+    m_blocks[4].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
+    m_blocks[5].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
+
 
     // 定数バッファの作成（重複していた cbd は1つだけにしました）
     D3D11_BUFFER_DESC cbd = { 0 };
-    cbd.Usage = D3D11_USAGE_DEFAULT;
+    cbd.Usage = D3D11_USAGE_DEFAULT;    
     cbd.ByteWidth = sizeof(ConstantBuffer);
     cbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     m_device->CreateBuffer(&cbd, NULL, &m_constantBuffer);
@@ -192,8 +200,8 @@ bool Engine::InitScene() {
     //追加: タイトル画面のUI画像を読み込む
     // （パスはご自身が用意した画像ファイルの場所に書き換えてください）
     CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/title_bg.jpg", nullptr, &m_texTitleBg);
-    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/cpu.jpg", nullptr, &m_texBtnCpu);
-    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/2p.jpg", nullptr, &m_texBtn2P);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/soloUI.png", nullptr, &m_texBtnCpu);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/battleUI.png", nullptr, &m_texBtn2P);
     CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/tutorial.png", nullptr, &m_texBtnTutorial);
     CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/back.png", nullptr, &m_texBtnBack);
  
@@ -297,7 +305,6 @@ void Engine::DrawGame() {
         m_frame.Draw(m_context.Get());
 
         // --- ② 落下中ブロックの描画 ---
-        // --- ② 落下中ブロックの描画 ---
         if (current_player->m_fallingGroup.IsActive()) {
             // グループ内のボールの数だけループして描画する
             for (int i = 0; i < current_player->m_fallingGroup.GetBlockCount(); ++i) {
@@ -318,7 +325,7 @@ void Engine::DrawGame() {
             }
         }
         // ==========================================================
-        // ★追加: 操作不可の攻撃ブロック(Attack)群の描画
+        //操作不可の攻撃ブロック(Attack)群の描画
         for (const auto& attack : current_player->GetActiveAttacks()) {
             for (int i = 0; i < attack.GetBlockCount(); ++i) {
                 int type = attack.GetType(i);
@@ -343,16 +350,15 @@ void Engine::DrawGame() {
                 int blockType = current_player->m_board.GetBlockType(c, r);
                 if (blockType != -1) {
 
-                    // ★追加: ひび割れ状態なら、大きさをリズミカルに変化させる（脈打つ）
-                    float drawScale = m_scale;
+                    // ★変更: m_scale ではなく m_blockScale を使うようにします！
+                    float drawScale = m_blockScale;
+
                     int crackedTurns = current_player->m_board.GetCrackedTurns(c, r);
                     if (crackedTurns >= 0) {
-                        // ターンが進む(割れる確率が上がる)ほど、脈打つスピードが速くなる！
                         float pulseSpeed = 0.01f + (crackedTurns * 0.005f);
                         drawScale *= (1.0f + 0.1f * sin(GetTickCount() * pulseSpeed));
                     }
 
-                    // ★変更: m_scale だった部分を drawScale に変えます
                     XMMATRIX mWorldBlock = XMMatrixScaling(drawScale, drawScale, drawScale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(current_player->m_board.GetX(c, r), current_player->m_board.GetY(r), 0.0f);
 
                     cb.vColor = blockColors[blockType];
@@ -667,16 +673,15 @@ void Engine::DrawTutorial() {
                 int blockType = current_player->m_board.GetBlockType(c, r);
                 if (blockType != -1) {
 
-                    // ★追加: ひび割れ状態なら、大きさをリズミカルに変化させる（脈打つ）
-                    float drawScale = m_scale;
+                    // ★変更: m_scale ではなく m_blockScale を使うようにします！
+                    float drawScale = m_blockScale;
+
                     int crackedTurns = current_player->m_board.GetCrackedTurns(c, r);
                     if (crackedTurns >= 0) {
-                        // ターンが進む(割れる確率が上がる)ほど、脈打つスピードが速くなる！
                         float pulseSpeed = 0.01f + (crackedTurns * 0.005f);
                         drawScale *= (1.0f + 0.1f * sin(GetTickCount() * pulseSpeed));
                     }
 
-                    // ★変更: m_scale だった部分を drawScale に変えます
                     XMMATRIX mWorldBlock = XMMatrixScaling(drawScale, drawScale, drawScale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(current_player->m_board.GetX(c, r), current_player->m_board.GetY(r), 0.0f);
 
                     cb.vColor = blockColors[blockType];

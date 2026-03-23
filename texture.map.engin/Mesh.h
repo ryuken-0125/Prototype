@@ -1,5 +1,8 @@
+// Mesh.h を以下のように修正します
+
 #pragma once
 
+#define NOMINMAX 
 #include <windows.h>
 #include <d3d11.h>
 #include <DirectXMath.h>
@@ -7,35 +10,31 @@
 #include <string>
 #include <vector>
 
-#define NOMINMAX
+//テクスチャ読み込み用のヘッダー
+#include <WICTextureLoader.h> 
 
-struct Vertex
-{
+struct Vertex {
     DirectX::XMFLOAT3 pos;
     DirectX::XMFLOAT2 uv;
-    DirectX::XMFLOAT3 normal; // 面の向き（法線ベクトル）
+    DirectX::XMFLOAT3 normal;
 };
 
-// Assimpの構造体を事前宣言（ヘッダーを軽くするため）
-struct aiMesh;
-struct aiScene;
-
-class Mesh
-{
+class Mesh {
 public:
     Mesh();
     ~Mesh();
 
-    //名前を LoadOBJ から LoadModel に変更（FBX等何でも読めます）
     bool LoadModel(ID3D11Device* device, const std::string& filename);
 
-    //描画する
+    //画像を読み込むための関数
+    bool LoadTexture(ID3D11Device* device, const std::wstring& filename);
+
     void Draw(ID3D11DeviceContext* context);
 
 private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_vertexBuffer;
     UINT m_vertexCount;
 
-    //Assimp用の内部読み込み関数
-    bool ProcessMesh(ID3D11Device* device, const aiMesh* mesh, const aiScene* scene);
+    //読み込んだ画像データを保存する変数
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_texture;
 };

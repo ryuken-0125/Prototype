@@ -77,14 +77,17 @@ private:
 
     //自分で頂点バッファを持たず、Meshクラスに任せる
     Mesh m_frame;       // 枠用のモデル
-    Mesh m_blocks[6];   // 4種類のブロック（0:R, 1:G, 2:B, 3:Y）
+    Mesh m_blocks[6 ];   // 4種類のブロック（0:R, 1:G, 2:B, 3:Y）
 
     //  3Dモデルの位置座標
     float m_posX, m_posY, m_posZ;
     // 3Dモデルのスケール（大きさ）
-    float m_scale;
+
+    float m_scale;          // フレーム（盤面）のスケール
+    float m_blockScale;     //ボール（卵）専用のスケール
 
     Scene m_currentScene; // 現在のシーン
+
     bool m_isCpuMatch;    // CPU対戦かどうか
     int m_menuCursor;     // コントローラー用のカーソル位置（0: CPU対戦, 1: 2人対戦）
 
