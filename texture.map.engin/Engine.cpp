@@ -28,15 +28,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 // コンストラクタでモデルの初期位置（原点）を設定
 Engine::Engine() : m_hwnd(nullptr), m_width(800), m_height(600), m_angle(0.0f),
-m_posX(0.0f), m_posY(0.0f), m_posZ(0.0f), m_scale(0.3f), m_blockScale(0.3f)
+m_posX(0.0f), m_posY(0.0f), m_posZ(0.0f), m_frameScale(0.3f), m_blockScale(0.166f)
 { 
 
 }
 
 Engine::~Engine() {
-    // ComPtrを使用しているため、明示的な解放処理は不要です（自動でクリーンアップされます）
+    //ComPtrを使用しているため、明示的な解放処理は不要です（自動でクリーンアップされます）
+  }
 
-}
+
 
 bool Engine::Init(HINSTANCE hInstance, int width, int height) {
     if (!InitWindow(hInstance, width, height)) return false;
@@ -199,7 +200,7 @@ bool Engine::InitScene() {
 
     //追加: タイトル画面のUI画像を読み込む
     // （パスはご自身が用意した画像ファイルの場所に書き換えてください）
-    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/title_bg.jpg", nullptr, &m_texTitleBg);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/title.png", nullptr, &m_texTitleBg);
     CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/soloUI.png", nullptr, &m_texBtnCpu);
     CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/battleUI.png", nullptr, &m_texBtn2P);
     CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/tutorial.png", nullptr, &m_texBtnTutorial);
@@ -293,7 +294,7 @@ void Engine::DrawGame() {
         // （元のプログラムでボールの左端が-2.4fの時、枠が0.0fにあったため、+2.4fずらして中央を合わせます）
         float framePosX = current_player->m_baseX + 2.4f;
 
-        XMMATRIX mScaleFrame = XMMatrixScaling(m_scale, m_scale, m_scale);
+        XMMATRIX mScaleFrame = XMMatrixScaling(m_frameScale, m_frameScale, m_frameScale);
         XMMATRIX mRotFrame = XMMatrixRotationY(m_angle);
         XMMATRIX mTransFrame = XMMatrixTranslation(framePosX, m_posY, m_posZ);
         XMMATRIX mWorldFrame = mScaleFrame * mRotFrame * mTransFrame;
@@ -310,7 +311,7 @@ void Engine::DrawGame() {
             for (int i = 0; i < current_player->m_fallingGroup.GetBlockCount(); ++i) {
                 int type = current_player->m_fallingGroup.GetType(i);
 
-                XMMATRIX mScaleBlock = XMMatrixScaling(m_scale, m_scale, m_scale);
+                XMMATRIX mScaleBlock = XMMatrixScaling(m_blockScale, m_blockScale, m_blockScale);
                 XMMATRIX mRotBlock = XMMatrixRotationY(m_angle);
                 // m_fallingBlock.GetX() ではなく、GetBlockX(i) を使う
                 XMMATRIX mTransBlock = XMMatrixTranslation(current_player->m_fallingGroup.GetBlockX(i), current_player->m_fallingGroup.GetBlockY(i), 0.0f);
@@ -330,7 +331,7 @@ void Engine::DrawGame() {
             for (int i = 0; i < attack.GetBlockCount(); ++i) {
                 int type = attack.GetType(i);
 
-                XMMATRIX mScaleBlock = XMMatrixScaling(m_scale, m_scale, m_scale);
+                XMMATRIX mScaleBlock = XMMatrixScaling(m_blockScale, m_blockScale, m_blockScale);
                 XMMATRIX mRotBlock = XMMatrixRotationY(m_angle);
                 XMMATRIX mTransBlock = XMMatrixTranslation(attack.GetBlockX(i), attack.GetBlockY(i), 0.0f);
                 XMMATRIX mWorldBlock = mScaleBlock * mRotBlock * mTransBlock;
@@ -350,7 +351,7 @@ void Engine::DrawGame() {
                 int blockType = current_player->m_board.GetBlockType(c, r);
                 if (blockType != -1) {
 
-                    // ★変更: m_scale ではなく m_blockScale を使うようにします！
+                    // ★変更: m_blockScale ではなく m_blockScale を使うようにします！
                     float drawScale = m_blockScale;
 
                     int crackedTurns = current_player->m_board.GetCrackedTurns(c, r);
@@ -634,7 +635,7 @@ void Engine::DrawTutorial() {
         Player* current_player = players[p];
         // --- 枠の描画 ---
         float framePosX = current_player->m_baseX + 2.4f;
-        XMMATRIX mWorldFrame = XMMatrixScaling(m_scale, m_scale, m_scale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(framePosX, m_posY, m_posZ);
+        XMMATRIX mWorldFrame = XMMatrixScaling(m_frameScale, m_frameScale, m_frameScale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(framePosX, m_posY, m_posZ);
         cb.vColor = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
         cb.mWorldViewProj = XMMatrixTranspose(mWorldFrame * mView * mProjection);
         cb.mWorld = XMMatrixTranspose(mWorldFrame);
@@ -645,7 +646,7 @@ void Engine::DrawTutorial() {
         if (current_player->m_fallingGroup.IsActive()) {
             for (int i = 0; i < current_player->m_fallingGroup.GetBlockCount(); ++i) {
                 int type = current_player->m_fallingGroup.GetType(i);
-                XMMATRIX mWorldBlock = XMMatrixScaling(m_scale, m_scale, m_scale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(current_player->m_fallingGroup.GetBlockX(i), current_player->m_fallingGroup.GetBlockY(i), 0.0f);
+                XMMATRIX mWorldBlock = XMMatrixScaling(m_blockScale, m_blockScale, m_blockScale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(current_player->m_fallingGroup.GetBlockX(i), current_player->m_fallingGroup.GetBlockY(i), 0.0f);
                 cb.vColor = blockColors[type];
                 cb.mWorldViewProj = XMMatrixTranspose(mWorldBlock * mView * mProjection);
                 cb.mWorld = XMMatrixTranspose(mWorldBlock);
@@ -658,7 +659,7 @@ void Engine::DrawTutorial() {
         for (const auto& attack : current_player->GetActiveAttacks()) {
             for (int i = 0; i < attack.GetBlockCount(); ++i) {
                 int type = attack.GetType(i);
-                XMMATRIX mWorldBlock = XMMatrixScaling(m_scale, m_scale, m_scale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(attack.GetBlockX(i), attack.GetBlockY(i), 0.0f);
+                XMMATRIX mWorldBlock = XMMatrixScaling(m_blockScale, m_blockScale, m_blockScale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(attack.GetBlockX(i), attack.GetBlockY(i), 0.0f);
                 cb.vColor = blockColors[type];
                 cb.mWorldViewProj = XMMatrixTranspose(mWorldBlock * mView * mProjection);
                 cb.mWorld = XMMatrixTranspose(mWorldBlock);
@@ -673,7 +674,7 @@ void Engine::DrawTutorial() {
                 int blockType = current_player->m_board.GetBlockType(c, r);
                 if (blockType != -1) {
 
-                    // ★変更: m_scale ではなく m_blockScale を使うようにします！
+                    // ★変更: m_blockScale ではなく m_blockScale を使うようにします！
                     float drawScale = m_blockScale;
 
                     int crackedTurns = current_player->m_board.GetCrackedTurns(c, r);

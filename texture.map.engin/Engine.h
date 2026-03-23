@@ -83,8 +83,8 @@ private:
     float m_posX, m_posY, m_posZ;
     // 3Dモデルのスケール（大きさ）
 
-    float m_scale;          // フレーム（盤面）のスケール
-    float m_blockScale;     //ボール（卵）専用のスケール
+    float m_frameScale;     // フレーム(枠)専用の大きさ
+    float m_blockScale;     // Block(卵)専用の大きさ
 
     Scene m_currentScene; // 現在のシーン
 

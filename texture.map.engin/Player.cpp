@@ -203,10 +203,10 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
 
     if (turnAdvanced) {
         if (m_board.AdvanceTurnAndBreak()) {
-            m_waitTimer = 20; // 割れた！色が混ざるアニメーションの余韻を作る
+            m_waitTimer = 20; // 割れた場合は、混ざる演出を見せるために少し待機
         }
         else {
-            m_waitTimer = 5;  // 割れなかった場合は通常の着地ウェイト
+            m_waitTimer = 5;  // 割れなかった場合の通常のウェイト
         }
     }
 

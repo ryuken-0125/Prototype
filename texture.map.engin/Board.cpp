@@ -19,7 +19,7 @@ void Board::Clear() {
     for (int r = 0; r < BOARD_HEIGHT; ++r) {
         for (int c = 0; c < BOARD_WIDTH; ++c) {
             m_grid[r][c] = -1;
-            m_crackedTurns[r][c] = -1; // ひび割れ関数
+            m_crackedTurns[r][c] = -1; // ひび割れリセット
         }
     }
 }
@@ -145,7 +145,8 @@ void Board::DFS(int c, int r, int type, std::vector<std::vector<bool>>& visited,
 }
 
 // --- 盤面全体を調べて消去する ---
-std::vector<int> Board::CheckAndErase() {
+std::vector<int> Board::CheckAndErase() 
+{
     std::vector<int> attacks;
     std::set<std::pair<int, int>> newlyCracked; // 時限爆弾になる卵（ピラミッド）
     std::set<std::pair<int, int>> toErase;      // 即座に消える卵（ただの6個連結）
@@ -157,7 +158,7 @@ std::vector<int> Board::CheckAndErase() {
         for (int c = 0; c < BOARD_WIDTH; ++c) {
             int cB2, rB2, cB3, rB3, cM1, rM1, cM2, rM2, cT1, rT1;
 
-            // ① 通常のピラミッド
+            // 通常ピラミッド形状のチェック
             if (GetHexNeighbor(c, r, 0, cB2, rB2) && GetHexNeighbor(cB2, rB2, 0, cB3, rB3) &&
                 GetHexNeighbor(c, r, 1, cM1, rM1) && GetHexNeighbor(cM1, rM1, 0, cM2, rM2) &&
                 GetHexNeighbor(cM1, rM1, 1, cT1, rT1)) {
@@ -169,20 +170,14 @@ std::vector<int> Board::CheckAndErase() {
                 }
 
                 for (auto& kv : colorMap) {
-                    if (kv.second.size() == 6) {
-                        bool isNewPyramid = false;
-                        for (auto& p : kv.second) {
-                            if (m_crackedTurns[p.second][p.first] == -1) { isNewPyramid = true; }
-                        }
-                        if (isNewPyramid) {
-                            for (auto& p : kv.second) newlyCracked.insert(p);
-                            attacks.push_back(3); // 攻撃発生！
-                        }
+                    // ★条件：同じ色が「5個」ならリーチ状態（ひび割れ）にする！
+                    if (kv.second.size() == 5) {
+                        for (auto& p : kv.second) newlyCracked.insert(p);
                     }
                 }
             }
 
-            // ② 逆ピラミッド
+            // 逆ピラミッド形状のチェック
             int cB2_r, rB2_r, cB3_r, rB3_r, cM1_r, rM1_r, cM2_r, rM2_r, cT1_r, rT1_r;
             if (GetHexNeighbor(c, r, 0, cB2_r, rB2_r) && GetHexNeighbor(cB2_r, rB2_r, 0, cB3_r, rB3_r) &&
                 GetHexNeighbor(c, r, 5, cM1_r, rM1_r) && GetHexNeighbor(cM1_r, rM1_r, 0, cM2_r, rM2_r) &&
@@ -194,70 +189,41 @@ std::vector<int> Board::CheckAndErase() {
                     if (m_grid[p.second][p.first] != -1) colorMapRev[m_grid[p.second][p.first]].push_back(p);
                 }
                 for (auto& kv : colorMapRev) {
-                    if (kv.second.size() == 6) {
-                        bool isNewPyramid = false;
-                        for (auto& p : kv.second) {
-                            if (m_crackedTurns[p.second][p.first] == -1) { isNewPyramid = true; }
-                        }
-                        if (isNewPyramid) {
-                            for (auto& p : kv.second) newlyCracked.insert(p);
-                            attacks.push_back(4); // 攻撃発生！
-                        }
+                    if (kv.second.size() == 5) {
+                        for (auto& p : kv.second) newlyCracked.insert(p);
                     }
                 }
             }
         }
     }
 
-    // =========================================================
-    // ★追加: 2. 単純な6個以上の連結の検出（DFS）
-    // =========================================================
+    // ② 単純な6個以上の連結の検出（DFS）
     std::vector<std::vector<bool>> visited(BOARD_HEIGHT, std::vector<bool>(BOARD_WIDTH, false));
     for (int r = 0; r < BOARD_HEIGHT; ++r) {
         for (int c = 0; c < BOARD_WIDTH; ++c) {
-            // 空ではなく、まだ調べていない卵があれば
             if (m_grid[r][c] != -1 && !visited[r][c]) {
                 std::vector<std::pair<int, int>> connected;
-                // 繋がっている卵をすべて見つけ出す
                 DFS(c, r, m_grid[r][c], visited, connected);
-
-                // もし6個以上繋がっていたら
                 if (connected.size() >= 6) {
-                    // そのグループが「ピラミッドの一部」になっていないか確認する
-                    bool isPartOfPyramid = false;
-                    for (auto& p : connected) {
-                        if (newlyCracked.find(p) != newlyCracked.end()) {
-                            isPartOfPyramid = true;
-                            break;
-                        }
-                    }
-
-                    // ピラミッドではない（ただの6個連結）なら、即座に消去するリストに入れる
-                    if (!isPartOfPyramid) {
-                        for (auto& p : connected) {
-                            toErase.insert(p);
-                        }
-                    }
+                    for (auto& p : connected) toErase.insert(p);
                 }
             }
         }
     }
 
-    // =========================================================
-    // 3. 状態の更新（ひび割れと消去の実行）
-    // =========================================================
-
-    // ピラミッドの卵を「ひび割れ（ターン0）」状態にする
-    for (auto& p : newlyCracked) {
-        if (m_crackedTurns[p.second][p.first] == -1) {
-            m_crackedTurns[p.second][p.first] = 0;
-        }
-    }
-
-    // ただの6個連結だった卵を、攻撃なしで即座に消し去る
+    // ③ 状態の更新
+    // 6個連結で消えるものは、ひび割れリストから除外して即座に消去
     for (auto& p : toErase) {
         m_grid[p.second][p.first] = -1;
         m_crackedTurns[p.second][p.first] = -1;
+        newlyCracked.erase(p);
+    }
+
+    // リーチの卵を「ひび割れ（ターン0）」状態にする
+    for (auto& p : newlyCracked) {
+        if (m_crackedTurns[p.second][p.first] == -1) {
+            m_crackedTurns[p.second][p.first] = 0; // ここからドキドキが始まる
+        }
     }
 
     return attacks;
@@ -284,18 +250,30 @@ bool Board::ApplyGravity() {
                 bool canMoveDown = (r >= 2 && m_grid[r - 2][c] == -1 && canMoveBL && canMoveBR);
 
                 // 優先度：真下 ＞ 左右の滑り落ち
-                if (canMoveDown) {
+                if (canMoveDown)
+                {
                     m_grid[r - 2][c] = m_grid[r][c]; m_grid[r][c] = -1; movedAny = true;
                 }
-                else if (canMoveBL && canMoveBR) {
+                else if (canMoveBL && canMoveBR) 
+                {
                     // 両方空いていたらランダムに滑らせるのもアリですが、ここでは左下に滑らせます
                     m_grid[b_r][bl_c] = m_grid[r][c]; m_grid[r][c] = -1; movedAny = true;
                 }
-                else if (canMoveBL) {
+                else if (canMoveBL)
+                {
                     m_grid[b_r][bl_c] = m_grid[r][c]; m_grid[r][c] = -1; movedAny = true;
                 }
-                else if (canMoveBR) {
+                else if (canMoveBR) 
+                {
                     m_grid[b_r][br_c] = m_grid[r][c]; m_grid[r][c] = -1; movedAny = true;
+                }
+                else if (m_grid[r][c] != -1 && m_grid[r - 1][c] == -1) 
+                {
+                    m_grid[r - 1][c] = m_grid[r][c];
+                    m_crackedTurns[r - 1][c] = m_crackedTurns[r][c]; // ひび割れも一緒に落ちる
+                    m_grid[r][c] = -1;
+                    m_crackedTurns[r][c] = -1;
+                    movedAny = true;
                 }
 
 
@@ -307,12 +285,13 @@ bool Board::ApplyGravity() {
 }
 
 //カラーミックス（0:赤, 1:青, 2:白, 3:紫, 4:水色, 5:ピンク）
-int Board::MixColor(int broken, int target) const {
+int Board::MixColor(int broken, int target) const 
+{
     if (target == -1) return -1;
     if ((broken == 0 && target == 1) || (broken == 1 && target == 0)) return 3; // 赤＋青＝紫
     if ((broken == 1 && target == 2) || (broken == 2 && target == 1)) return 4; // 青＋白＝水色
     if ((broken == 0 && target == 2) || (broken == 2 && target == 0)) return 5; // 赤＋白＝ピンク
-    return target; // 上記以外はそのまま
+    return target; // 上記以外（すでに混ざっている色など）は変化しない
 }
 
 // 6. ファイルの一番下に、ターン経過＆割れる処理を追加
@@ -320,7 +299,8 @@ struct BreakInfo { int c, r, color; };
 
 bool Board::AdvanceTurnAndBreak() {
     std::vector<BreakInfo> toBreak;
-    int breakChances[] = { 0, 40, 70, 90, 100 }; // 0〜4ターンの割れる確率
+    // 0〜4ターン目の割れる確率（1T:40%, 2T:70%, 3T:90%, 4T:100%）
+    int breakChances[] = { 0, 40, 70, 90, 100 };
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -331,9 +311,9 @@ bool Board::AdvanceTurnAndBreak() {
             if (m_crackedTurns[r][c] >= 0) {
                 m_crackedTurns[r][c]++; // ターンを進める
                 int turns = m_crackedTurns[r][c];
-                if (turns > 4) turns = 4; // 最大4ターン
+                if (turns > 4) turns = 4; // 限界突破防止
 
-                // 確率で割れるか判定
+                // 確率判定
                 if (dist(gen) <= breakChances[turns]) {
                     toBreak.push_back({ c, r, m_grid[r][c] });
                 }
@@ -341,15 +321,15 @@ bool Board::AdvanceTurnAndBreak() {
         }
     }
 
-    if (toBreak.empty()) return false;
+    if (toBreak.empty()) return false; // 何も割れなかった
 
-    // 割れる卵を一旦すべて空にする
+    // 割れる卵を一旦すべて盤面から消す
     for (auto& info : toBreak) {
         m_grid[info.r][info.c] = -1;
         m_crackedTurns[info.r][info.c] = -1;
     }
 
-    // 周囲6方向に色を混ぜる（絵の具システム）
+    // 割れた卵の周囲6方向に色を混ぜる（絵の具システム）
     for (auto& info : toBreak) {
         for (int dir = 0; dir < 6; ++dir) {
             int nc, nr;
@@ -361,5 +341,5 @@ bool Board::AdvanceTurnAndBreak() {
             }
         }
     }
-    return true; // 割れたのでアニメーション待機を要求する
+    return true; // 割れて色が混ざった！
 }
