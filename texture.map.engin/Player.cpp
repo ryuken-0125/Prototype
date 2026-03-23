@@ -25,7 +25,7 @@ void Player::SpawnRandomBlock(bool isCPU)
 {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> typeDist(0, 3);
+    std::uniform_int_distribution<int> typeDist(0, 2);
     std::uniform_int_distribution<int> colDist(0, BOARD_WIDTH - 1);
 
     // ★設定された個数分だけ、ランダムな色を用意する
@@ -46,8 +46,6 @@ void Player::SpawnRandomBlock(bool isCPU)
     }
 }
 
-// Player.cpp の Update() メソッドをまるごと差し替えます
-
 std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rotateKey, bool isCPU) {
     std::vector<int> generatedAttacks;
 
@@ -65,29 +63,37 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
         return generatedAttacks;
     }
 
-    // 1. 画面に降っている攻撃ブロック群の落下処理
+    bool turnAdvanced = false;
+
+    // 画面に降っている攻撃ブロック群の落下処理
     if (!m_activeAttacks.empty()) {
         auto it = m_activeAttacks.begin();
         float fallSpeed = 0.04f;
         bool lockedAny = false;
 
-        while (it != m_activeAttacks.end()) {
+        while (it != m_activeAttacks.end())
+        {
             bool canFall = true;
             for (int i = 0; i < it->GetBlockCount(); ++i) {
-                if (m_board.IsCollision(it->GetBlockX(i), it->GetBlockY(i) - fallSpeed)) {
+                if (m_board.IsCollision(it->GetBlockX(i), it->GetBlockY(i) - fallSpeed))
+                {
                     canFall = false; break;
                 }
             }
 
-            if (canFall) {
+            if (canFall) 
+            {
                 it->Update(fallSpeed);
-                ++it;
+                ++it;   
             }
-            else {
-                for (int i = 0; i < it->GetBlockCount(); ++i) {
+            else 
+            {
+                for (int i = 0; i < it->GetBlockCount(); ++i)
+                {
                     m_board.LockBlock(it->GetBlockX(i), it->GetBlockY(i), it->GetType(i));
                 }
                 it = m_activeAttacks.erase(it);
+                turnAdvanced = true; //着地したのでターンを進める
                 lockedAny = true;
             }
         }
@@ -96,25 +102,28 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
         return generatedAttacks;
     }
 
-    // ==========================================================
-    // 2. プレイヤーのブロックがなく、かつ攻撃キューにストックがあれば一気に出現させる
+    // プレイヤーのブロックがなく、かつ攻撃キューにストックがあれば一気に出現させる
     if (!m_fallingGroup.IsActive())
     {
-        for (int c = 0; c < BOARD_WIDTH; ++c) {
-            if (m_board.GetBlockType(c, BOARD_HEIGHT - 1) != -1) {
+        for (int c = 0; c < BOARD_WIDTH; ++c) 
+        {
+            if (m_board.GetBlockType(c, BOARD_HEIGHT - 1) != -1) 
+            {
                 m_isGameOver = true;
                 return generatedAttacks;
             }
         }
 
-        if (!m_attackQueue.empty()) {
+        if (!m_attackQueue.empty())
+        {
             float attackGapY = BLOCK_RADIUS * 7.0f;
             float currentStartY = m_board.GetY(BOARD_HEIGHT + 2);
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_int_distribution<int> colDist(1, BOARD_WIDTH - 4);
 
-            while (!m_attackQueue.empty()) {
+            while (!m_attackQueue.empty())
+            {
                 int attackType = m_attackQueue.front();
                 m_attackQueue.erase(m_attackQueue.begin());
                 float startX = m_board.GetX(colDist(gen), BOARD_HEIGHT - 1);
@@ -123,14 +132,14 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
             }
             return generatedAttacks;
         }
-        else {
-            if (!m_isDummyMode) {
+        else
+        {
+            if (!m_isDummyMode)
+            {
                 SpawnRandomBlock(isCPU);
             }
         }
-    } // ★★★ ここが抜けていた超重要な閉じ波括弧です！ ★★★
-    // ==========================================================
-
+    } 
 
     // 3. プレイヤーの操作と落下処理
     if (m_fallingGroup.IsActive()) {
@@ -138,12 +147,12 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
 
         if (!isCPU) {
             if (GetAsyncKeyState(leftKey) & 0x8000) {
-                if (!m_isLeftPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS * 2.0f); m_isLeftPressed = true; }
+                if (!m_isLeftPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() - BLOCK_RADIUS *1.0f); m_isLeftPressed = true; }
             }
             else { m_isLeftPressed = false; }
 
             if (GetAsyncKeyState(rightKey) & 0x8000) {
-                if (!m_isRightPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 2.0f); m_isRightPressed = true; }
+                if (!m_isRightPressed) { m_fallingGroup.SetX(m_fallingGroup.GetX() + BLOCK_RADIUS * 1.0f); m_isRightPressed = true; }
             }
             else { m_isRightPressed = false; }
 
@@ -187,12 +196,23 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
                 m_board.LockBlock(m_fallingGroup.GetBlockX(i), m_fallingGroup.GetBlockY(i), m_fallingGroup.GetType(i));
             }
             m_fallingGroup.SetInactive();
+            turnAdvanced = true;
             m_waitTimer = 5;
+        }
+    }
+
+    if (turnAdvanced) {
+        if (m_board.AdvanceTurnAndBreak()) {
+            m_waitTimer = 20; // 割れた！色が混ざるアニメーションの余韻を作る
+        }
+        else {
+            m_waitTimer = 5;  // 割れなかった場合は通常の着地ウェイト
         }
     }
 
     return generatedAttacks;
 }
+
 void Player::DecideCPUTarget(int targetType) {
     int bestCol = 0;
     int maxScore = -9999; // 最初はあり得ない低い点数にしておく
@@ -253,13 +273,10 @@ void Player::DecideCPUTarget(int targetType) {
     m_cpuTargetCol = bestCol;
 }
 
-// ==========================================================
 bool Player::IsGameOver() const {
     return m_isGameOver;
 }
 
-// ==========================================================
-//盤面と状態の完全リセット
 void Player::Reset() {
     m_board.Init(m_baseX, m_baseY); // 盤面をクリアしつつ座標も設定
     m_board.Clear();              // 盤面をまっさらにする

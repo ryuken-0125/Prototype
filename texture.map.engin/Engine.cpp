@@ -144,18 +144,21 @@ bool Engine::InitScene() {
 
     // 3Dモデル(.obj)の読み込み
 // ★変更: 枠のモデル読み込み（ファイルパスは現在成功している枠のものにしてください）
-    if (!m_frame.LoadOBJ(m_device.Get(), "C:/DX11/sixball/asset/model/frame.obj")) {
+    if (!m_frame.LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/frame.obj")) 
+    {
         MessageBoxA(m_hwnd, "枠のOBJファイルの読み込みに失敗しました。", "Error", MB_OK);
         return false;
     }
 
     //4つのブロックの読み込み（ファイルパスをご自身の環境に合わせて修正してください）
-    m_blocks[0].LoadOBJ(m_device.Get(), "C:/DX11/sixball/asset/model/Block_R.obj");
-    m_blocks[1].LoadOBJ(m_device.Get(), "C:/DX11/sixball/asset/model/Block_G.obj");
-    m_blocks[2].LoadOBJ(m_device.Get(), "C:/DX11/sixball/asset/model/Block_B.obj");
-    m_blocks[3].LoadOBJ(m_device.Get(), "C:/DX11/sixball/asset/model/Block_Y.obj");
-
-
+    m_blocks[0].LoadModel(m_device.Get(), "asset/model/1.fbx");
+    m_blocks[1].LoadModel(m_device.Get(), "asset/model/2.fbx");
+    m_blocks[2].LoadModel(m_device.Get(), "asset/model/3l.fbx");
+    m_blocks[3].LoadModel(m_device.Get(), "asset/model/4.fbx");
+    m_blocks[4].LoadModel(m_device.Get(), "asset/model/5.fbx");
+    m_blocks[5].LoadModel(m_device.Get(), "asset/model/6.fbx");
+    m_blocks[6].LoadModel(m_device.Get(), "asset/model/7.fbx");
+    m_blocks[7].LoadModel(m_device.Get(), "asset/model/8.fbx");
 
     // 定数バッファの作成（重複していた cbd は1つだけにしました）
     D3D11_BUFFER_DESC cbd = { 0 };
@@ -253,13 +256,15 @@ void Engine::DrawGame() {
     cb.vLightDir = XMFLOAT4(1.0f, -1.0f, 1.0f, 0.0f);
     cb.vLightColor = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 
-    XMFLOAT4 blockColors[4] = {
-        XMFLOAT4(1.0f, 0.2f, 0.2f, 1.0f), // 赤
-        XMFLOAT4(0.2f, 1.0f, 0.2f, 1.0f), // 緑
-        XMFLOAT4(0.2f, 0.4f, 1.0f, 1.0f), // 青
-        XMFLOAT4(1.0f, 1.0f, 0.2f, 1.0f)  // 黄
+    XMFLOAT4 blockColors[6] =
+    {
+            XMFLOAT4(1.0f, 0.2f, 0.2f, 1.0f), // 0: 赤
+            XMFLOAT4(0.2f, 0.4f, 1.0f, 1.0f), // 1: 青
+            XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), // 2: 白
+            XMFLOAT4(0.8f, 0.2f, 0.8f, 1.0f), // 3: 紫 (混色)
+            XMFLOAT4(0.3f, 0.8f, 1.0f, 1.0f), // 4: 水色 (混色)
+            XMFLOAT4(1.0f, 0.6f, 0.8f, 1.0f)  // 5: ピンク (混色)
     };
-
     // シェーダーのセット
     m_context->IASetInputLayout(m_inputLayout.Get());
     m_context->VSSetShader(m_vertexShader.Get(), NULL, 0);
@@ -331,24 +336,29 @@ void Engine::DrawGame() {
                 m_blocks[type].Draw(m_context.Get());
             }
         }
-        // --- ③ 盤面に固定されたブロック群の描画 ---
+       
+        // --- 固定されたブロックの描画 ---
         for (int r = 0; r < BOARD_HEIGHT; ++r) {
             for (int c = 0; c < BOARD_WIDTH; ++c) {
                 int blockType = current_player->m_board.GetBlockType(c, r);
                 if (blockType != -1) {
-                    float posX = current_player->m_board.GetX(c, r);
-                    float posY = current_player->m_board.GetY(r);
 
-                    XMMATRIX mScaleBlock = XMMatrixScaling(m_scale, m_scale, m_scale);
-                    XMMATRIX mRotBlock = XMMatrixRotationY(m_angle);
-                    XMMATRIX mTransBlock = XMMatrixTranslation(posX, posY, 0.0f);
-                    XMMATRIX mWorldBlock = mScaleBlock * mRotBlock * mTransBlock;
+                    // ★追加: ひび割れ状態なら、大きさをリズミカルに変化させる（脈打つ）
+                    float drawScale = m_scale;
+                    int crackedTurns = current_player->m_board.GetCrackedTurns(c, r);
+                    if (crackedTurns >= 0) {
+                        // ターンが進む(割れる確率が上がる)ほど、脈打つスピードが速くなる！
+                        float pulseSpeed = 0.01f + (crackedTurns * 0.005f);
+                        drawScale *= (1.0f + 0.1f * sin(GetTickCount() * pulseSpeed));
+                    }
+
+                    // ★変更: m_scale だった部分を drawScale に変えます
+                    XMMATRIX mWorldBlock = XMMatrixScaling(drawScale, drawScale, drawScale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(current_player->m_board.GetX(c, r), current_player->m_board.GetY(r), 0.0f);
 
                     cb.vColor = blockColors[blockType];
                     cb.mWorldViewProj = XMMatrixTranspose(mWorldBlock * mView * mProjection);
                     cb.mWorld = XMMatrixTranspose(mWorldBlock);
                     m_context->UpdateSubresource(m_constantBuffer.Get(), 0, NULL, &cb, 0, 0);
-
                     m_blocks[blockType].Draw(m_context.Get());
                 }
             }
@@ -592,9 +602,15 @@ void Engine::DrawTutorial() {
     ConstantBuffer cb = {};
     cb.vLightDir = XMFLOAT4(1.0f, -1.0f, 1.0f, 0.0f);
     cb.vLightColor = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    XMFLOAT4 blockColors[4] = {
-        XMFLOAT4(1.0f, 0.2f, 0.2f, 1.0f), XMFLOAT4(0.2f, 1.0f, 0.2f, 1.0f),
-        XMFLOAT4(0.2f, 0.4f, 1.0f, 1.0f), XMFLOAT4(1.0f, 1.0f, 0.2f, 1.0f)
+
+    XMFLOAT4 blockColors[6] =
+    {
+            XMFLOAT4(1.0f, 0.2f, 0.2f, 1.0f), // 0: 赤
+            XMFLOAT4(0.2f, 0.4f, 1.0f, 1.0f), // 1: 青
+            XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), // 2: 白
+            XMFLOAT4(0.8f, 0.2f, 0.8f, 1.0f), // 3: 紫 (混色)
+            XMFLOAT4(0.3f, 0.8f, 1.0f, 1.0f), // 4: 水色 (混色)
+            XMFLOAT4(1.0f, 0.6f, 0.8f, 1.0f)  // 5: ピンク (混色)
     };
 
     m_context->IASetInputLayout(m_inputLayout.Get());
@@ -650,7 +666,19 @@ void Engine::DrawTutorial() {
             for (int c = 0; c < BOARD_WIDTH; ++c) {
                 int blockType = current_player->m_board.GetBlockType(c, r);
                 if (blockType != -1) {
-                    XMMATRIX mWorldBlock = XMMatrixScaling(m_scale, m_scale, m_scale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(current_player->m_board.GetX(c, r), current_player->m_board.GetY(r), 0.0f);
+
+                    // ★追加: ひび割れ状態なら、大きさをリズミカルに変化させる（脈打つ）
+                    float drawScale = m_scale;
+                    int crackedTurns = current_player->m_board.GetCrackedTurns(c, r);
+                    if (crackedTurns >= 0) {
+                        // ターンが進む(割れる確率が上がる)ほど、脈打つスピードが速くなる！
+                        float pulseSpeed = 0.01f + (crackedTurns * 0.005f);
+                        drawScale *= (1.0f + 0.1f * sin(GetTickCount() * pulseSpeed));
+                    }
+
+                    // ★変更: m_scale だった部分を drawScale に変えます
+                    XMMATRIX mWorldBlock = XMMatrixScaling(drawScale, drawScale, drawScale) * XMMatrixRotationY(m_angle) * XMMatrixTranslation(current_player->m_board.GetX(c, r), current_player->m_board.GetY(r), 0.0f);
+
                     cb.vColor = blockColors[blockType];
                     cb.mWorldViewProj = XMMatrixTranspose(mWorldBlock * mView * mProjection);
                     cb.mWorld = XMMatrixTranspose(mWorldBlock);

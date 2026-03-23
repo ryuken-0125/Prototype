@@ -1,7 +1,6 @@
 // Board.h
 
 
-
 #pragma once
 #include <vector>
 #include <utility>
@@ -16,24 +15,39 @@ public:
     //初期化時に盤面の位置を自由に決められるようにする
     void Init(float baseX, float baseY);
     void Clear();
+    void LockBlock(float x, float y, int type);
+    bool ApplyGravity();
+
+    std::vector<int> CheckAndErase();
 
     float GetX(int col, int row) const;
     float GetY(int row) const;
     bool IsCollision(float x, float nextY) const;
-   // bool CheckAndErase();
-    bool ApplyGravity();
-    void LockBlock(float x, float y, int type);
-    int GetBlockType(int col, int row) const;
 
-    std::vector<int> CheckAndErase();
+    int GetBlockType(int col, int row) const { return m_grid[row][col]; }
+
+    int GetCrackedTurns(int col, int row) const { return m_crackedTurns[row][col]; }
+
+    bool AdvanceTurnAndBreak();
 
 private:
     float m_baseX; //この盤面の左下のX座標
     float m_baseY; //この盤面の左下のY座標
     int m_grid[BOARD_HEIGHT][BOARD_WIDTH];
 
+    int m_crackedTurns[BOARD_HEIGHT][BOARD_WIDTH];
+    int MixColor(int brokenColor, int targetColor) const;
+
     bool GetHexNeighbor(int c, int r, int dir, int& nc, int& nr) const;
 
     void GetNeighbors(int c, int r, std::vector<std::pair<int, int>>& neighbors) const;
-    void DFS(int c, int r, int type, std::vector<std::vector<bool>>& visited, std::vector<std::pair<int, int>>& connected) const;
+    void DFS(int c, int r, int targetType, std::vector<std::vector<bool>>& visited, std::vector<std::pair<int, int>>& connected) const;
+
 };
+
+
+
+
+
+
+

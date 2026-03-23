@@ -7,7 +7,7 @@ Attack::Attack(int attackType, float startX, float startY, float blockRadius)
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> typeDist(0, 3); // 0〜3のランダムな色
+    std::uniform_int_distribution<int> typeDist(0, 2);
 
     float R = blockRadius;
     float H = blockRadius * 1.73205f; // 高さのズレ（ルート3）

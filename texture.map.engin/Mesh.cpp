@@ -1,127 +1,111 @@
-
 #include "Mesh.h"
-#include <fstream>
-#include <sstream>
 #include <iostream>
-#include <algorithm> // （std::replaceを使うため）
 
+#undef min
+#undef max
 
+//Assimpの機能を読み込む
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 using namespace DirectX;
 
 Mesh::Mesh() : m_vertexCount(0) {}
 Mesh::~Mesh() {}
 
-// Mesh.cpp の LoadOBJ メソッド内を修正
+// =========================================================
+// 1. モデルファイルの読み込み（FBX, OBJなんでも対応）
+// =========================================================
+bool Mesh::LoadModel(ID3D11Device* device, const std::string& filename) {
+    Assimp::Importer importer;
 
-bool Mesh::LoadOBJ(ID3D11Device* device, const std::string& filename) {
-    std::vector<XMFLOAT3> temp_positions;
-    std::vector<XMFLOAT2> temp_uvs;
-    std::vector<XMFLOAT3> temp_normals; //法線データを一時保存する配列
-    std::vector<Vertex> vertices;
+    // =========================================================
+    //Assimpの読み込みフラグに「PreTransformVertices」を追加します
+    const aiScene* scene = importer.ReadFile(filename,
+        aiProcess_Triangulate |
+        aiProcess_ConvertToLeftHanded |
+        aiProcess_GenNormals |
+        aiProcess_JoinIdenticalVertices |
+        aiProcess_PreTransformVertices);  //回転やスケールを事前に全て適用（焼き付け）する！
+    // =========================================================
 
-    std::ifstream file(filename);
-    if (!file.is_open()) return false;
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+        std::cerr << "モデル読み込みエラー: " << importer.GetErrorString() << std::endl;
+        return false;
+    }
 
-    std::string line;
-    while (std::getline(file, line)) {
-        std::istringstream iss(line);
-        std::string type;
-        iss >> type;
+    if (scene->mNumMeshes > 0) {
+        return ProcessMesh(device, scene->mMeshes[0], scene);
+    }
 
-        if (type == "v") {
-            XMFLOAT3 pos;
-            iss >> pos.x >> pos.y >> pos.z;
-            pos.z *= -1.0f;
-            temp_positions.push_back(pos);
+    return false;
+}
+
+// =========================================================
+// 2. 読み込んだデータの抜き出しとGPUバッファ化
+// =========================================================
+bool Mesh::ProcessMesh(ID3D11Device* device, const aiMesh* mesh, const aiScene* scene) {
+    std::vector<Vertex> vertices; // 一時保存用の頂点リスト
+
+    // 1. 頂点データを一つずつ抜き出す
+    for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
+        Vertex vertex;
+
+        // 座標
+        vertex.pos.x = mesh->mVertices[i].x;
+        vertex.pos.y = mesh->mVertices[i].y;
+        vertex.pos.z = mesh->mVertices[i].z;
+
+        // 法線
+        if (mesh->HasNormals()) {
+            vertex.normal.x = mesh->mNormals[i].x;
+            vertex.normal.y = mesh->mNormals[i].y;
+            vertex.normal.z = mesh->mNormals[i].z;
         }
-        else if (type == "vt") {
-            XMFLOAT2 uv;
-            iss >> uv.x >> uv.y;
-            uv.y = 1.0f - uv.y;
-            temp_uvs.push_back(uv);
+        else {
+            vertex.normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
         }
-        else if (type == "vn") { //法線データの読み込み
-            XMFLOAT3 normal;
-            iss >> normal.x >> normal.y >> normal.z;
-            normal.z *= -1.0f; // Z座標の反転に合わせて法線の向きも反転させる
-            temp_normals.push_back(normal);
+
+        // UV座標 (モデルによっては複数持つことができるが、最初の[0]番目を使う)
+        if (mesh->mTextureCoords[0]) {
+            vertex.uv.x = mesh->mTextureCoords[0][i].x;
+            vertex.uv.y = mesh->mTextureCoords[0][i].y;
         }
-        // Mesh.cpp の LoadOBJ 内
+        else {
+            vertex.uv = XMFLOAT2(0.0f, 0.0f);
+        }
 
-        else if (type == "f") {
-            std::string vertexData;
-            std::vector<Vertex> faceVertices;
+        vertices.push_back(vertex);
+    }
 
-            // 行の最後まですべての頂点を読み込む（四角形や多角形にも対応）
-            while (iss >> vertexData) {
-                int v = 0, vt = 0, vn = 0;
-                std::stringstream viss(vertexData);
-                std::string val;
-
-                // スラッシュ(/)で区切って安全に読み込む（UVがない v//vn 形式でもエラーにならない）
-                std::getline(viss, val, '/');
-                if (!val.empty()) v = std::stoi(val);
-
-                std::getline(viss, val, '/');
-                if (!val.empty()) vt = std::stoi(val);
-
-                std::getline(viss, val, '/');
-                if (!val.empty()) vn = std::stoi(val);
-
-                Vertex vertex;
-                // 頂点座標 (必須)
-                if (v > 0 && v <= temp_positions.size()) {
-                    vertex.pos = temp_positions[v - 1];
-                }
-
-                // UV座標 (無い場合は仮に 0,0 を入れる)
-                if (vt > 0 && vt <= temp_uvs.size()) {
-                    vertex.uv = temp_uvs[vt - 1];
-                }
-                else {
-                    vertex.uv = DirectX::XMFLOAT2(0.0f, 0.0f);
-                }
-
-                // 法線 (無い場合は仮の手前向きの法線を入れる)
-                if (vn > 0 && vn <= temp_normals.size()) {
-                    vertex.normal = temp_normals[vn - 1];
-                }
-                else {
-                    vertex.normal = DirectX::XMFLOAT3(0.0f, 0.0f, -1.0f);
-                }
-
-                faceVertices.push_back(vertex);
-            }
-
-            // 読み込んだ頂点を三角形に分割して登録する（ポリゴン分割）
-            // 3頂点なら1回、4頂点(四角形)なら2回ループします
-            for (size_t i = 1; i < faceVertices.size() - 1; ++i) {
-                // ★重要: 面の裏返りを直す処理
-                // Maya(右手系) -> DirectX(左手系) への変換のため、
-                // 頂点の登録順を 0番 → (i+1)番 → i番 と「逆回り」にします
-                vertices.push_back(faceVertices[0]);
-                vertices.push_back(faceVertices[i + 1]);
-                vertices.push_back(faceVertices[i]);
-            }
+    // 2. 面（ポリゴン）の情報を元に、頂点を描画する順番に並べ直す
+    std::vector<Vertex> orderedVertices;
+    for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
+        aiFace face = mesh->mFaces[i];
+        // aiProcess_Triangulate を指定しているので、必ず3角形（インデックス3つ）になっている
+        for (unsigned int j = 0; j < face.mNumIndices; j++) {
+            orderedVertices.push_back(vertices[face.mIndices[j]]);
         }
     }
 
+    m_vertexCount = (UINT)orderedVertices.size();
 
-    m_vertexCount = (UINT)vertices.size();
-
-    // GPUに頂点バッファを作成
+    // 3. GPUに頂点バッファを作成
     D3D11_BUFFER_DESC bd = {};
     bd.Usage = D3D11_USAGE_DEFAULT;
     bd.ByteWidth = sizeof(Vertex) * m_vertexCount;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     D3D11_SUBRESOURCE_DATA initData = {};
-    initData.pSysMem = vertices.data();
+    initData.pSysMem = orderedVertices.data();
 
     HRESULT hr = device->CreateBuffer(&bd, &initData, &m_vertexBuffer);
     return SUCCEEDED(hr);
 }
 
+// =========================================================
+// 3. 描画
+// =========================================================
 void Mesh::Draw(ID3D11DeviceContext* context) {
     if (m_vertexCount == 0) return;
     UINT stride = sizeof(Vertex);
