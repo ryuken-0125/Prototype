@@ -134,7 +134,7 @@ std::vector<int> Player::Update(int leftKey, int rightKey, int downKey, int rota
 
     // 3. ƒvƒŒƒCƒ„[‚Ì‘€ì‚Æ—‰ºˆ—
     if (m_fallingGroup.IsActive()) {
-        float speed = 0.01f;
+        float speed = 0.03f;
 
         if (!isCPU) {
             if (GetAsyncKeyState(leftKey) & 0x8000) {

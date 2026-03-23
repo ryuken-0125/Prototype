@@ -15,6 +15,7 @@ Attack::Attack(int attackType, float startX, float startY, float blockRadius)
     // Attack.cpp の Attack コンストラクタ内を修正します
 
     // 形に応じたボールの個数と相対座標の設定
+    /*
     if (attackType == 1) { // 横4つ
         m_blockCount = 4;
         m_offsetX = { 0, 2 * R, 4 * R, 6 * R };
@@ -25,7 +26,9 @@ Attack::Attack(int attackType, float startX, float startY, float blockRadius)
         m_offsetX = { 0, R, 2 * R, 3 * R };
         m_offsetY = { 0, H, 2 * H, 3 * H };
     }
-    else if (attackType == 3) { //ピラミッド (下3, 中2, 上1)
+    */
+
+    if (attackType == 3) { //ピラミッド (下3, 中2, 上1)
         m_blockCount = 6;
         m_offsetX = { 0, 2 * R, 4 * R, R, 3 * R, 2 * R };
         m_offsetY = { 0, 0,   0,   H, H,   2 * H };

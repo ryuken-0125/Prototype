@@ -48,7 +48,7 @@ private:
     //FallingGroup m_fallingGroup;
     //bool m_isRotatePressed; // 回転キーの1回押し判定用
 
-    const int FALLING_BLOCK_COUNT = 2; // ここを 3 にすれば3個になる
+    const int FALLING_BLOCK_COUNT = 2 ; // ここを 3 にすれば3個になる
 
     // ここを 4 にすれば、1回ストレートを作るだけで相手に4回連続でストレートが降ります。
     const int ATTACK_MULTIPLIER = 3;

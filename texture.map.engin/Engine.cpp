@@ -195,7 +195,7 @@ bool Engine::InitScene() {
     CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/back.png", nullptr, &m_texBtnBack);
  
     try {
-        m_font = std::make_unique<DirectX::SpriteFont>(m_device.Get(), L"C:/DX11/sixball/asset/Font/AYASE.TTF");
+        m_font = std::make_unique<DirectX::SpriteFont>(m_device.Get(), L"C:/DX11/sixball/asset/Font/tutorial_font.spritefont");
     }
     catch (...) {
         // ファイルがない場合は無視する（文字は出ないがゲームは動く）
@@ -666,7 +666,7 @@ void Engine::DrawTutorial() {
     if (m_font) {
         // ★変更: 呼び出す関数の名前を変えます
         std::wstring msg = m_tutorial.GetTutorialMessage();
-
+            
         if (!msg.empty()) {
             DirectX::XMVECTOR origin = m_font->MeasureString(msg.c_str()) / 2.0f;
             DirectX::XMVECTOR textPos = DirectX::XMVectorSet(m_width / 2.0f, 50.0f, 0.0f, 0.0f);
