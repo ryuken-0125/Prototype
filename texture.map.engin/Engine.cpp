@@ -146,27 +146,27 @@ bool Engine::InitScene() {
 
     // 3Dモデル(.obj)の読み込み
 // ★変更: 枠のモデル読み込み（ファイルパスは現在成功している枠のものにしてください）
-    if (!m_frame.LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/frame.obj")) 
+    if (!m_frame.LoadModel(m_device.Get(),  "asset/model/frame.obj"))
     {
         MessageBoxA(m_hwnd, "枠のOBJファイルの読み込みに失敗しました。", "Error", MB_OK);
         return false;
     }
 
     //4つのブロックの読み込み（ファイルパスをご自身の環境に合わせて修正してください）
-    m_blocks[0].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/aka.fbx");
-    m_blocks[1].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/ao.fbx");
-    m_blocks[2].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/siro.fbx");
-    m_blocks[3].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/pink.fbx");
-    m_blocks[4].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/murasaki.fbx"); 
-    m_blocks[5].LoadModel(m_device.Get(), "C:/DX11/sixball/asset/model/mizuiro.fbx");
+    m_blocks[0].LoadModel(m_device.Get(), "asset/model/aka.fbx");
+    m_blocks[1].LoadModel(m_device.Get(), "asset/model/ao.fbx");
+    m_blocks[2].LoadModel(m_device.Get(), "asset/model/siro.fbx");
+    m_blocks[3].LoadModel(m_device.Get(), "asset/model/pink.fbx");
+    m_blocks[4].LoadModel(m_device.Get(), "asset/model/murasaki.fbx");
+    m_blocks[5].LoadModel(m_device.Get(), "asset/model/mizuiro.fbx");  
 
-
-    m_blocks[0].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
-    m_blocks[1].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
-    m_blocks[2].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
-    m_blocks[3].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
-    m_blocks[4].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
-    m_blocks[5].LoadTexture(m_device.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg");
+            
+    m_blocks[0].LoadTexture(m_device.Get(), L"asset/Texture/rainbow.jpg");
+    m_blocks[1].LoadTexture(m_device.Get(), L"asset/Texture/rainbow.jpg");
+    m_blocks[2].LoadTexture(m_device.Get(), L"asset/Texture/rainbow.jpg");
+    m_blocks[3].LoadTexture(m_device.Get(), L"asset/Texture/rainbow.jpg");
+    m_blocks[4].LoadTexture(m_device.Get(), L"asset/Texture/rainbow.jpg");
+    m_blocks[5].LoadTexture(m_device.Get(), L"asset/Texture/rainbow.jpg");
 
 
     // 定数バッファの作成（重複していた cbd は1つだけにしました）
@@ -177,7 +177,7 @@ bool Engine::InitScene() {
     m_device->CreateBuffer(&cbd, NULL, &m_constantBuffer);
 
     // テクスチャとサンプラーの読み込み
-    HRESULT hrTex = CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/rainbow.jpg", nullptr, &m_texture);
+    HRESULT hrTex = CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"asset/Texture/rainbow.jpg", nullptr, &m_texture);
     if (FAILED(hrTex))
     {
         // 読み込みに失敗した場合は警告を出す
@@ -200,14 +200,14 @@ bool Engine::InitScene() {
 
     //追加: タイトル画面のUI画像を読み込む
     // （パスはご自身が用意した画像ファイルの場所に書き換えてください）
-    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/title.png", nullptr, &m_texTitleBg);
-    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/soloUI.png", nullptr, &m_texBtnCpu);
-    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/battleUI.png", nullptr, &m_texBtn2P);
-    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/tutorial.png", nullptr, &m_texBtnTutorial);
-    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"C:/DX11/sixball/asset/Texture/back.png", nullptr, &m_texBtnBack);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"asset/Texture/title.png", nullptr, &m_texTitleBg);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"asset/Texture/soloUI.png", nullptr, &m_texBtnCpu);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"asset/Texture/battleUI.png", nullptr, &m_texBtn2P);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"asset/Texture/tutorial.png", nullptr, &m_texBtnTutorial);
+    CreateWICTextureFromFile(m_device.Get(), m_context.Get(), L"asset/Texture/back.png", nullptr, &m_texBtnBack);
  
     try {
-        m_font = std::make_unique<DirectX::SpriteFont>(m_device.Get(), L"C:/DX11/sixball/asset/Font/tutorial_font.spritefont");
+        m_font = std::make_unique<DirectX::SpriteFont>(m_device.Get(), L"asset/Font/tutorial_font.spritefont");
     }
     catch (...) {
         // ファイルがない場合は無視する（文字は出ないがゲームは動く）
